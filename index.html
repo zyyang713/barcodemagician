@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖書與期刊條碼掃描系統</title>
+    <!-- 使用 Tailwind CSS 快速建立現代化美觀的介面 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 html5-qrcode 庫用於相機掃描 -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        /* 讓表格內容垂直置中 */
+        td { vertical-align: middle; }
+        /* 隱藏捲軸但保留滾動功能 (美化) */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* 掃描框美化 */
+        #reader video { object-fit: cover; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <!-- 頁首與標題 -->
+        <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-col md:flex-row items-center justify-between border border-gray-100">
+            <div>
+                <h1 class="text-3xl font-bold text-indigo-700 mb-2">📚 圖書與期刊條碼掃描系統</h1>
+                <p class="text-gray-500 text-sm">支援 ISBN (書籍) 與 ISSN (期刊) 自動判別與資訊補完</p>
+            </div>
+            <div class="mt-4 md:mt-0 text-right">
+                <p class="text-xs text-gray-400">來源：Google, Open Library, 台灣書店(爬蟲), ISSN Portal</p>
+                <div class="mt-2 flex flex-wrap justify-end gap-2 items-center">
+                    <!-- 匯出 CSV 按鈕 -->
+                    <button onclick="exportToCSV()" class="flex items-center px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        匯出 CSV
+                    </button>
+                    <div class="flex items-center space-x-2 ml-2">
+                        <span class="relative flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        </span>
+                        <span class="text-sm font-medium text-green-600">系統就緒</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 掃描輸入區 -->
+        <div class="bg-white rounded-xl shadow-sm p-8 mb-6 border border-gray-100 text-center relative overflow-hidden">
+            <label for="barcodeInput" class="block text-lg font-medium text-gray-700 mb-4">
+                請連接實體條碼槍掃描，或使用平板/手機相機掃描：
+            </label>
+            
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+                <input 
+                    type="text" 
+                    id="barcodeInput" 
+                    class="w-full md:w-2/3 lg:w-1/2 text-center text-4xl font-mono tracking-widest p-4 border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition-all shadow-inner bg-gray-50"
+                    placeholder="掃描或輸入條碼..."
+                    autocomplete="off"
+                >
+                
+                <!-- 新增：平板相機啟用按鈕 -->
+                <button id="startCameraBtn" class="flex items-center justify-center px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-300 w-full md:w-auto">
+                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    啟用相機掃描
+                </button>
+            </div>
+            <p class="mt-3 text-sm text-gray-400">系統會在收到條碼後自動進行查詢</p>
+        </div>
+
+        <!-- 結果表格 -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto no-scrollbar">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">時間</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-20">類型</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">條碼</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">名稱 / 資訊</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">狀態</th>
+                            <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-48">外部連結</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody" class="bg-white divide-y divide-gray-200">
+                        <tr id="emptyStateRow">
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-400">
+                                尚未掃描任何條碼
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增：相機掃描彈出視窗 (Modal) -->
+    <div id="cameraModal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                    掃描條碼中
+                </h3>
+                <button id="closeCameraBtn" class="text-gray-400 hover:text-red-500 focus:outline-none transition-colors p-1 rounded-full hover:bg-red-50">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <!-- 相機預覽區域 -->
+            <div id="reader" class="w-full bg-black min-h-[300px]"></div>
+            <div class="p-4 text-center text-sm text-gray-600 bg-gray-50 border-t">
+                請將書籍或期刊條碼置於紅色掃描線內<br>
+                <span class="text-xs text-gray-400 mt-1 block">若無法對焦，請嘗試調整平板與書籍的距離</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const barcodeInput = document.getElementById('barcodeInput');
+        const resultsTableBody = document.getElementById('resultsTableBody');
+        const emptyStateRow = document.getElementById('emptyStateRow');
+
+        // 平板友善的自動聚焦：
+        // 如果使用者是用滑鼠點擊(Desktop)，則自動聚焦；如果是觸控(Tablet/Mobile)，則不強制聚焦避免彈出虛擬鍵盤
+        document.addEventListener('mouseup', (e) => {
+            // 檢查是否為按鈕或連結，如果是則不處理
+            const isClickable = e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('button');
+            if (!isClickable && window.matchMedia("(pointer: fine)").matches) {
+                // 只有精確指針設備（滑鼠）才會強制聚焦輸入框
+                barcodeInput.focus();
+            }
+        });
+
+        // 頁面載入時，如果是電腦則自動聚焦
+        if (window.matchMedia("(pointer: fine)").matches) {
+            barcodeInput.focus();
+        }
+
+        // 監聽鍵盤事件 (實體條碼槍掃描後通常會送出 Enter 鍵)
+        barcodeInput.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                const code = this.value.trim().toUpperCase();
+                this.value = ''; // 清空輸入框
+                if (code) {
+                    processBarcode(code);
+                }
+            }
+        });
+
+        // --- 新增：相機掃描邏輯 ---
+        let html5QrCode;
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const closeCameraBtn = document.getElementById('closeCameraBtn');
+        const cameraModal = document.getElementById('cameraModal');
+
+        startCameraBtn.addEventListener('click', () => {
+            cameraModal.classList.remove('hidden');
+            // 初始化掃描器
+            html5QrCode = new Html5Qrcode("reader");
+            
+            // 掃描設定：使用後置鏡頭，設定掃描框大小
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 150 },
+                aspectRatio: 1.0,
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ] // 針對 ISBN/ISSN 最佳化
+            };
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, // 強制使用後置鏡頭
+                config,
+                (decodedText, decodedResult) => {
+                    // 掃描成功回呼
+                    stopCamera();
+                    // 填入輸入框並觸發查詢
+                    barcodeInput.value = decodedText;
+                    processBarcode(decodedText);
+                },
+                (errorMessage) => {
+                    // 掃描中未辨識到條碼的常態錯誤，忽略即可
+                }
+            ).catch((err) => {
+                showToast("無法存取相機，請確認是否已授予相機權限。");
+                stopCamera();
+            });
+        });
+
+        closeCameraBtn.addEventListener('click', stopCamera);
+
+        function stopCamera() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    cameraModal.classList.add('hidden');
+                }).catch((err) => {
+                    console.error("關閉相機失敗", err);
+                    cameraModal.classList.add('hidden');
+                });
+            } else {
+                cameraModal.classList.add('hidden');
+            }
+        }
+
+        // 播放提示音 (成功或失敗)
+        function playBeep(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                osc.type = type === 'success' ? 'sine' : 'square';
+                osc.frequency.setValueAtTime(type === 'success' ? 800 : 300, ctx.currentTime);
+                osc.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.1);
+            } catch (error) {
+                console.log("Audio play prevented by browser");
+            }
+        }
+
+        // 複製文字到剪貼簿
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                console.error('無法複製', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // 簡易的畫面提示 (Toast)
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 z-50';
+            toast.innerText = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        // 匯出 CSV 功能
+        function exportToCSV() {
+            const rows = document.querySelectorAll('#resultsTableBody tr');
+            let csvContent = '\uFEFF'; 
+            csvContent += '時間,類型,條碼,名稱與資訊,狀態\n';
+
+            let hasData = false;
+            rows.forEach(row => {
+                if (row.id === 'emptyStateRow' && row.style.display !== 'none') return;
+                
+                const cols = row.querySelectorAll('td');
+                if (cols.length >= 5) {
+                    const time = cols[0].innerText.trim();
+                    const type = cols[1].innerText.trim();
+                    const code = cols[2].innerText.trim();
+                    const info = cols[3].innerText.trim().replace(/\r?\n/g, ' | ');
+                    const status = cols[4].innerText.trim();
+
+                    if (type !== '判斷中') {
+                        hasData = true;
+                        const escapeCSV = (str) => '"' + str.replace(/"/g, '""') + '"';
+                        csvContent += `${escapeCSV(time)},${escapeCSV(type)},${escapeCSV(code)},${escapeCSV(info)},${escapeCSV(status)}\n`;
+                    }
+                }
+            });
+
+            if (!hasData) {
+                showToast('目前沒有資料可以匯出');
+                return;
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
+            link.setAttribute('download', `條碼掃描紀錄_${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 代理伺服器容錯切換機制
+        async function fetchHtml(targetUrl) {
+            let lastError = "";
+            try {
+                let res = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`);
+                if (res.ok) return await res.text();
+                lastError = "CodeTabs 狀態碼: " + res.status;
+            } catch(e) { lastError = e.message; }
+            
+            try {
+                let res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                if (res.ok) {
+                    let data = await res.json();
+                    if (data.contents) return data.contents;
+                }
+                lastError += " | AllOrigins 狀態碼: " + res.status;
+            } catch(e) { lastError += " | AllOrigins 錯誤: " + e.message; }
+            
+            throw new Error("所有代理伺服器皆被阻擋或無回應: " + lastError);
+        }
+
+        // 台灣本土書店爬蟲 (三民)
+        async function scrapeSanmin(isbn) {
+            try {
+                const targetUrl = `https://www.sanmin.com.tw/search/index/?ct=K&qu=${isbn}`;
+                const html = await fetchHtml(targetUrl);
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const titleEl = doc.querySelector('h3.title a') || doc.querySelector('.resultBooks h3 a');
+                const authorEl = doc.querySelector('.author a') || doc.querySelector('.author');
+                const pubEl = doc.querySelector('.publisher a') || doc.querySelector('.publisher');
+                
+                if (titleEl && titleEl.innerText.trim()) {
+                    let title = titleEl.innerText.trim();
+                    let author = authorEl ? authorEl.innerText.trim().replace('作者：', '').trim() : '';
+                    let publisher = pubEl ? pubEl.innerText.trim().replace('出版社：', '').replace('出版單位：', '').trim() : '';
+                    return { title, author, publisher, source: '三民' };
+                }
+            } catch (e) { console.log("三民爬蟲失敗:", e.message); }
+            return null;
+        }
+
+        // 台灣本土書店爬蟲 (博客來)
+        async function scrapeBooks(isbn) {
+            try {
+                const targetUrl = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
+                const html = await fetchHtml(targetUrl);
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                const titleEl = doc.querySelector('.table-td h4 a') || doc.querySelector('.box_1 h3 a') || doc.querySelector('h4 a[title]') || doc.querySelector('.type02_p002 h1');
+                const authorEl = doc.querySelector('.table-td p.author a') || doc.querySelector('p.author a') || doc.querySelector('.type02_p003 a');
+                const pubEl = doc.querySelector('a[rel="mid_publish"]') || doc.querySelector('a[href*="sys_pubid"]');
+                
+                if (titleEl && titleEl.innerText.trim()) {
+                    let title = titleEl.innerText.trim();
+                    let author = authorEl ? authorEl.innerText.trim() : '';
+                    let publisher = pubEl ? pubEl.innerText.trim() : '';
+                    return { title, author, publisher, source: '博客來' };
+                }
+            } catch (e) { console.log("博客來爬蟲失敗:", e.message); }
+            return null;
+        }
+
+        // 處理並辨識條碼
+        async function processBarcode(code) {
+            if (emptyStateRow) {
+                emptyStateRow.style.display = 'none';
+            }
+
+            const cleanCode = code.replace(/-/g, '');
+            const rowId = 'row-' + Date.now();
+            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+            let tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = "hover:bg-gray-50 transition-colors";
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">判斷中</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">${code}</td>
+                <td class="px-6 py-4 text-sm text-gray-500">
+                    <div class="flex items-center space-x-2">
+                        <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>網路查詢中...</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">讀取中</span></td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"></td>
+            `;
+            resultsTableBody.insertBefore(tr, resultsTableBody.firstChild);
+
+            if (cleanCode.length === 8 || (code.includes('-') && code.length === 9 && cleanCode.length === 8)) {
+                const formattedISSN = cleanCode.substring(0, 4) + '-' + cleanCode.substring(4);
+                await fetchISSN(formattedISSN, rowId, timeStr);
+            } else if (cleanCode.length === 10 || cleanCode.length === 13) {
+                await fetchISBN(cleanCode, rowId, timeStr);
+            } else {
+                updateRow(rowId, timeStr, '未知', code, '條碼長度不符合標準 ISBN 或 ISSN', '錯誤', 'error', '');
+                playBeep('error');
+            }
+        }
+
+        // 查詢 ISSN
+        async function fetchISSN(issn, rowId, timeStr) {
+            const targetUrl = `https://portal.issn.org/resource/ISSN/${issn}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+            try {
+                const response = await fetch(proxyUrl);
+                const data = await response.json();
+                
+                if (data.contents) {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data.contents, 'text/html');
+                    const titleTag = doc.querySelector('title');
+                    let journalTitle = "查無名稱";
+                    
+                    if (titleTag && titleTag.innerText) {
+                        const parts = titleTag.innerText.split('|');
+                        journalTitle = parts.length > 1 ? parts[1].trim() : titleTag.innerText.trim();
+                    }
+
+                    const actionHtml = `
+                        <a href="${targetUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-900 inline-flex items-center">
+                            查看 ISSN Portal <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                        </a>
+                    `;
+                    updateRow(rowId, timeStr, 'ISSN', issn, `<span class="font-bold text-gray-900">${journalTitle}</span>`, '成功', 'success', actionHtml);
+                    playBeep('success');
+                } else {
+                    throw new Error("Empty contents");
+                }
+            } catch (error) {
+                const actionHtml = `<a href="${targetUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-900">手動查詢</a>`;
+                updateRow(rowId, timeStr, 'ISSN', issn, '連線失敗或查無資料', '失敗', 'error', actionHtml);
+                playBeep('error');
+            }
+        }
+
+        // 查詢 ISBN
+        async function fetchISBN(isbn, rowId, timeStr) {
+            const nclLink = `https://isbn.ncl.edu.tw/NEW_ISBNNet/main_Webpage_Normal.php?PCODE=Search&type=B&val=${isbn}`;
+            const booksLink = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
+            
+            const actionHtml = `
+                <div class="flex flex-col items-end space-y-1">
+                    <button onclick="copyToClipboard('${isbn}'); showToast('條碼 ${isbn} 已複製，請在網頁貼上查詢。')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded border border-gray-300 w-full mb-1 transition-colors">
+                        📋 複製條碼
+                    </button>
+                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-900 inline-flex items-center text-xs font-medium">
+                        國圖查詢 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                    <a href="${booksLink}" target="_blank" class="text-green-600 hover:text-green-900 inline-flex items-center text-xs font-medium mt-1">
+                        博客來查詢 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+                    </a>
+                </div>
+            `;
+
+            let bookData = { title: '', author: '', publisher: '', sources: [] };
+            const isComplete = () => bookData.title && bookData.author && bookData.publisher;
+
+            const updateBookData = (newTitle, newAuthor, newPublisher, sourceName) => {
+                let updated = false;
+                if (!bookData.title && newTitle) { bookData.title = newTitle; updated = true; }
+                if (!bookData.author && newAuthor) { bookData.author = newAuthor; updated = true; }
+                if (!bookData.publisher && newPublisher) { bookData.publisher = newPublisher; updated = true; }
+                if (updated && sourceName && !bookData.sources.includes(sourceName)) {
+                    bookData.sources.push(sourceName);
+                }
+            };
+
+            try {
+                // 1. Google Books API
+                try {
+                    let gBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
+                    let gRes = await fetch(gBooksUrl);
+                    let gData = await gRes.json();
+
+                    if (!gData.items || gData.items.length === 0) {
+                        gBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=${isbn}`;
+                        gRes = await fetch(gBooksUrl);
+                        gData = await gRes.json();
+                    }
+
+                    if (gData.items && gData.items.length > 0) {
+                        const info = gData.items[0].volumeInfo;
+                        updateBookData(
+                            info.title || '', 
+                            info.authors ? info.authors.join(', ') : '', 
+                            info.publisher || '', 
+                            'Google'
+                        );
+                    }
+                } catch (e) { console.log("Google 查詢失敗", e); }
+
+                // 2. Open Library API
+                if (!isComplete()) {
+                    try {
+                        const olUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
+                        const olRes = await fetch(olUrl);
+                        const olData = await olRes.json();
+                        const key = `ISBN:${isbn}`;
+
+                        if (olData[key]) {
+                            const info = olData[key];
+                            updateBookData(
+                                info.title || '', 
+                                info.authors ? info.authors.map(a => a.name).join(', ') : '', 
+                                info.publishers ? info.publishers.map(p => p.name).join(', ') : '', 
+                                'OpenLib'
+                            );
+                        }
+                    } catch (e) { console.log("Open Library 查詢失敗", e); }
+                }
+
+                // 3. 三民
+                if (!isComplete()) {
+                    const sanminData = await scrapeSanmin(isbn);
+                    if (sanminData) {
+                        updateBookData(sanminData.title, sanminData.author, sanminData.publisher, sanminData.source);
+                    }
+                }
+
+                // 4. 博客來
+                if (!isComplete()) {
+                    const booksData = await scrapeBooks(isbn);
+                    if (booksData) {
+                        updateBookData(booksData.title, booksData.author, booksData.publisher, booksData.source);
+                    }
+                }
+
+                // 結果顯示
+                if (bookData.title) {
+                    const pubBadge = bookData.publisher ? `<span class="inline-block mt-1 ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">${bookData.publisher}</span>` : '';
+                    const displayTxt = `<span class="font-bold text-gray-900">${bookData.title}</span> <br><span class="text-xs text-gray-500">${bookData.author || '未知作者'}</span> ${pubBadge}`;
+                    const sourceText = `成功 (${bookData.sources.join('+')})`;
+                    
+                    updateRow(rowId, timeStr, 'ISBN', isbn, displayTxt, sourceText, 'success', actionHtml);
+                    playBeep('success');
+                } else {
+                    updateRow(rowId, timeStr, 'ISBN', isbn, '<span class="text-red-500">查無此書，請點擊右側連結手動查詢</span>', '無資料', 'warning', actionHtml);
+                    playBeep('error');
+                }
+
+            } catch (error) {
+                updateRow(rowId, timeStr, 'ISBN', isbn, '處理資料時發生意外錯誤', '錯誤', 'error', actionHtml);
+                playBeep('error');
+            }
+        }
+
+        // 更新 UI
+        function updateRow(rowId, timeStr, type, code, infoHtml, statusText, statusType, actionHtml) {
+            const tr = document.getElementById(rowId);
+            if (!tr) return;
+
+            let statusBadge = '';
+            if (statusType === 'success') {
+                statusBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">${statusText}</span>`;
+            } else if (statusType === 'error') {
+                statusBadge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">${statusText}</span>`;
+            } else {
+                statusBadge = `<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-semibold">${statusText}</span>`;
+            }
+
+            const typeColor = type === 'ISBN' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-purple-600 bg-purple-50 border-purple-200';
+
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                    <span class="px-2 py-1 rounded border ${typeColor}">${type}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-800">${code}</td>
+                <td class="px-6 py-4 text-sm text-gray-800">${infoHtml}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">${actionHtml}</td>
+            `;
+        }
+    </script>
+</body>
+</html>
