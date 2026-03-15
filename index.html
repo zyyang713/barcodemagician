@@ -4,43 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>圖書與期刊條碼掃描系統</title>
-    <!-- 使用 Tailwind CSS 快速建立現代化美觀的介面 -->
+    <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 html5-qrcode 庫用於相機掃描 -->
+    <!-- 引入 html5-qrcode 用於相機掃描 -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        /* 讓表格內容垂直置中 */
         td { vertical-align: middle; }
-        /* 隱藏捲軸但保留滾動功能 (美化) */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* 掃描框美化 */
         #reader video { object-fit: cover; border-radius: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen font-sans text-gray-800">
 
-    <div class="max-w-6xl mx-auto px-4 py-8">
+    <div class="max-w-7xl mx-auto px-4 py-8">
         <!-- 頁首與標題 -->
         <div class="bg-white rounded-xl shadow-sm p-6 mb-6 flex flex-col md:flex-row items-center justify-between border border-gray-100">
             <div>
                 <h1 class="text-3xl font-bold text-indigo-700 mb-2">📚 圖書與期刊條碼掃描系統</h1>
-                <p class="text-gray-500 text-sm">支援 ISBN (書籍) 與 ISSN (期刊) 自動判別與資訊補完</p>
+                <p class="text-gray-500 text-sm">支援 ISBN (書籍) 與 ISSN (期刊) 自動判別、跨國庫補完與手動編輯</p>
             </div>
             <div class="mt-4 md:mt-0 text-right">
-                <p class="text-xs text-gray-400">來源：Google, Open Library, 台灣書店(爬蟲), ISSN Portal</p>
+                <p class="text-xs text-gray-400">來源：東華大學, ISBNSearch, Google, Open Library, 三民, 博客來, ISSN Portal</p>
                 <div class="mt-2 flex flex-wrap justify-end gap-2 items-center">
-                    <!-- 匯出 CSV 按鈕 -->
-                    <button onclick="exportToCSV()" class="flex items-center px-3 py-1 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <button onclick="openDictModal()" class="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+                        字典設定
+                    </button>
+                    <button onclick="exportToCSV()" class="flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded hover:bg-indigo-100 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow-sm">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                         匯出 CSV
                     </button>
-                    <div class="flex items-center space-x-2 ml-2">
+                    <div class="flex items-center space-x-2 ml-3 bg-green-50 px-3 py-1.5 rounded border border-green-100 shadow-sm">
                         <span class="relative flex h-3 w-3">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                         </span>
-                        <span class="text-sm font-medium text-green-600">系統就緒</span>
+                        <span class="text-sm font-medium text-green-700">系統就緒</span>
                     </div>
                 </div>
             </div>
@@ -48,26 +48,25 @@
 
         <!-- 掃描輸入區 -->
         <div class="bg-white rounded-xl shadow-sm p-8 mb-6 border border-gray-100 text-center relative overflow-hidden">
-            <label for="barcodeInput" class="block text-lg font-medium text-gray-700 mb-4">
+            <label for="barcodeInput" class="block text-lg font-medium text-gray-700 mb-5">
                 請連接實體條碼槍掃描，或使用平板/手機相機掃描：
             </label>
             
-            <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 max-w-3xl mx-auto">
                 <input 
                     type="text" 
                     id="barcodeInput" 
-                    class="w-full md:w-2/3 lg:w-1/2 text-center text-4xl font-mono tracking-widest p-4 border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition-all shadow-inner bg-gray-50"
+                    class="w-full md:flex-1 text-center text-3xl md:text-4xl font-mono tracking-widest p-4 border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition-all shadow-inner bg-gray-50"
                     placeholder="掃描或輸入條碼..."
                     autocomplete="off"
                 >
                 
-                <!-- 新增：平板相機啟用按鈕 -->
-                <button id="startCameraBtn" class="flex items-center justify-center px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-300 w-full md:w-auto">
+                <button id="startCameraBtn" class="flex items-center justify-center px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-300 w-full md:w-auto h-full text-lg whitespace-nowrap">
                     <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    啟用相機掃描
+                    相機掃描
                 </button>
             </div>
-            <p class="mt-3 text-sm text-gray-400">系統會在收到條碼後自動進行查詢</p>
+            <p class="mt-4 text-sm text-gray-400">系統會在收到條碼後自動進行跨國與本土資料庫查詢</p>
         </div>
 
         <!-- 結果表格 -->
@@ -79,15 +78,15 @@
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-24">時間</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-20">類型</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">條碼</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">名稱 / 資訊</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">狀態</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">名稱 / 作者 / 出版社</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">資料來源</th>
                             <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-48">外部連結</th>
                         </tr>
                     </thead>
                     <tbody id="resultsTableBody" class="bg-white divide-y divide-gray-200">
                         <tr id="emptyStateRow">
-                            <td colspan="6" class="px-6 py-12 text-center text-gray-400">
-                                尚未掃描任何條碼
+                            <td colspan="6" class="px-6 py-16 text-center text-gray-400 text-lg">
+                                尚未掃描任何條碼，請開始作業
                             </td>
                         </tr>
                     </tbody>
@@ -96,7 +95,7 @@
         </div>
     </div>
 
-    <!-- 新增：相機掃描彈出視窗 (Modal) -->
+    <!-- 相機掃描彈出視窗 (Modal) -->
     <div id="cameraModal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
             <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
@@ -108,48 +107,122 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <!-- 相機預覽區域 -->
             <div id="reader" class="w-full bg-black min-h-[300px]"></div>
             <div class="p-4 text-center text-sm text-gray-600 bg-gray-50 border-t">
-                請將書籍或期刊條碼置於紅色掃描線內<br>
-                <span class="text-xs text-gray-400 mt-1 block">若無法對焦，請嘗試調整平板與書籍的距離</span>
+                請將書籍 (ISBN) 或期刊 (ISSN) 條碼置於掃描線內<br>
+                <span class="text-xs text-gray-400 mt-1 block">若無法對焦，請嘗試調整裝置與書籍的距離</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 字典設定彈出視窗 (Modal) -->
+    <div id="dictModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg>
+                    自訂拼音字典設定
+                </h3>
+                <button onclick="closeDictModal()" class="text-gray-400 hover:text-red-500 focus:outline-none transition-colors p-1 rounded-full hover:bg-red-50">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 overflow-y-auto flex-1">
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 mb-2">在此新增的拼音對應會儲存在您的設備中。請輸入小寫拼音及對應的繁體中文名稱。</p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="text" id="newPinyin" placeholder="例如: kang xuan" class="flex-1 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="newZh" placeholder="例如: 康軒文教" class="flex-1 text-sm border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button onclick="addDictEntry()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap">新增</button>
+                    </div>
+                </div>
+                
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">拼音 (Pinyin)</th>
+                                <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">繁體中文</th>
+                                <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dictTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- 動態插入字典內容 -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // ==========================================
+        // ⚙️ 使用者自訂設定區 (可隨時在此新增字典)
+        // ==========================================
+        
+        // 台灣常見出版社拼音字典：系統內建防線
+        const BASE_PINYIN_DICTIONARY = {
+            'tian xia za zhi': '天下雜誌',
+            'tian xia wen hua': '天下文化',
+            'shi bao wen hua': '時報文化',
+            'shi bao chu ban': '時報出版',
+            'yuan liu': '遠流出版',
+            'lian jing': '聯經出版',
+            'huang guan': '皇冠文化',
+            'san min': '三民書局',
+            'wu nan': '五南',
+            'mai tian': '麥田',
+            'da kuai wen hua': '大塊文化',
+            'dong li': '東立',
+            'jiao jian': '台灣角川',
+            'tai wan jiao jian': '台灣角川',
+            'jian hong': '建宏',
+            'yuan shen': '圓神',
+            'fang zhi': '方智',
+            'xian jue': '先覺',
+            'bao ping': '寶瓶文化',
+            'shang zhou': '商周出版',
+            'jiu ge': '九歌',
+            'chiu ko': '九歌',
+            'erya': '爾雅',
+            'hong fan': '洪範',
+            'mu ma wen hua': '木馬文化'
+        };
+
+        // 從 LocalStorage 載入使用者透過 UI 自訂的字典
+        let customPinyinDict = JSON.parse(localStorage.getItem('customPinyinDict')) || {};
+
         const barcodeInput = document.getElementById('barcodeInput');
         const resultsTableBody = document.getElementById('resultsTableBody');
         const emptyStateRow = document.getElementById('emptyStateRow');
 
-        // 平板友善的自動聚焦：
-        // 如果使用者是用滑鼠點擊(Desktop)，則自動聚焦；如果是觸控(Tablet/Mobile)，則不強制聚焦避免彈出虛擬鍵盤
+        // ==========================================
+        // 1. UI 互動與硬體控制 (鍵盤、相機、音效)
+        // ==========================================
+        
         document.addEventListener('mouseup', (e) => {
-            // 檢查是否為按鈕或連結，如果是則不處理
-            const isClickable = e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('button');
-            if (!isClickable && window.matchMedia("(pointer: fine)").matches) {
-                // 只有精確指針設備（滑鼠）才會強制聚焦輸入框
+            // 確保點擊其他輸入框時不會被搶走焦點
+            const isInteractive = e.target.tagName === 'A' || 
+                                  e.target.tagName === 'BUTTON' || 
+                                  e.target.closest('button') || 
+                                  e.target.tagName === 'INPUT';
+                                  
+            if (!isInteractive && window.matchMedia("(pointer: fine)").matches) {
                 barcodeInput.focus();
             }
         });
+        if (window.matchMedia("(pointer: fine)").matches) { barcodeInput.focus(); }
 
-        // 頁面載入時，如果是電腦則自動聚焦
-        if (window.matchMedia("(pointer: fine)").matches) {
-            barcodeInput.focus();
-        }
-
-        // 監聽鍵盤事件 (實體條碼槍掃描後通常會送出 Enter 鍵)
         barcodeInput.addEventListener('keyup', function(e) {
             if (e.key === 'Enter') {
                 const code = this.value.trim().toUpperCase();
-                this.value = ''; // 清空輸入框
-                if (code) {
-                    processBarcode(code);
-                }
+                this.value = ''; 
+                if (code) processBarcode(code);
             }
         });
 
-        // --- 新增：相機掃描邏輯 ---
+        // 相機控制
         let html5QrCode;
         const startCameraBtn = document.getElementById('startCameraBtn');
         const closeCameraBtn = document.getElementById('closeCameraBtn');
@@ -157,53 +230,43 @@
 
         startCameraBtn.addEventListener('click', () => {
             cameraModal.classList.remove('hidden');
-            // 初始化掃描器
             html5QrCode = new Html5Qrcode("reader");
-            
-            // 掃描設定：使用後置鏡頭，設定掃描框大小
             const config = { 
                 fps: 10, 
                 qrbox: { width: 250, height: 150 },
                 aspectRatio: 1.0,
-                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ] // 針對 ISBN/ISSN 最佳化
+                formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8 ]
             };
             
             html5QrCode.start(
-                { facingMode: "environment" }, // 強制使用後置鏡頭
+                { facingMode: "environment" },
                 config,
-                (decodedText, decodedResult) => {
-                    // 掃描成功回呼
+                (decodedText) => {
                     stopCamera();
-                    // 填入輸入框並觸發查詢
                     barcodeInput.value = decodedText;
                     processBarcode(decodedText);
+                    barcodeInput.value = '';
                 },
-                (errorMessage) => {
-                    // 掃描中未辨識到條碼的常態錯誤，忽略即可
-                }
-            ).catch((err) => {
-                showToast("無法存取相機，請確認是否已授予相機權限。");
+                () => {} // 忽略常態未辨識錯誤
+            ).catch(() => {
+                showToast("無法存取相機，請確認是否在 HTTPS 環境下並已授予相機權限。");
                 stopCamera();
             });
         });
 
         closeCameraBtn.addEventListener('click', stopCamera);
-
         function stopCamera() {
             if (html5QrCode) {
                 html5QrCode.stop().then(() => {
                     html5QrCode.clear();
                     cameraModal.classList.add('hidden');
-                }).catch((err) => {
-                    console.error("關閉相機失敗", err);
-                    cameraModal.classList.add('hidden');
-                });
+                }).catch(() => cameraModal.classList.add('hidden'));
             } else {
                 cameraModal.classList.add('hidden');
             }
         }
 
-        // 播放提示音 (成功或失敗)
+        // 音效與提示
         function playBeep(type) {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -213,30 +276,13 @@
                 osc.connect(ctx.destination);
                 osc.start();
                 osc.stop(ctx.currentTime + 0.1);
-            } catch (error) {
-                console.log("Audio play prevented by browser");
-            }
+            } catch (error) { console.log("音效遭瀏覽器阻擋"); }
         }
 
-        // 複製文字到剪貼簿
-        function copyToClipboard(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            try {
-                document.execCommand('copy');
-            } catch (err) {
-                console.error('無法複製', err);
-            }
-            document.body.removeChild(textArea);
-        }
-
-        // 簡易的畫面提示 (Toast)
         function showToast(message) {
             const toast = document.createElement('div');
-            toast.className = 'fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded shadow-lg transition-opacity duration-300 z-50';
-            toast.innerText = message;
+            toast.className = 'fixed bottom-6 right-6 bg-gray-800 text-white px-5 py-3 rounded-lg shadow-2xl transition-opacity duration-300 z-50 flex items-center';
+            toast.innerHTML = `<svg class="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> ${message}`;
             document.body.appendChild(toast);
             setTimeout(() => {
                 toast.style.opacity = '0';
@@ -244,16 +290,609 @@
             }, 3000);
         }
 
-        // 匯出 CSV 功能
+        function copyToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try { document.execCommand('copy'); } catch (err) {}
+            document.body.removeChild(textArea);
+        }
+
+        // ==========================================
+        // 2. 手動編輯與刪除功能
+        // ==========================================
+
+        function deleteRow(rowId) {
+            const tr = document.getElementById(rowId);
+            if (tr) {
+                tr.remove();
+                checkEmptyState();
+                showToast('已刪除該筆紀錄');
+            }
+        }
+
+        function checkEmptyState() {
+            const tbody = document.getElementById('resultsTableBody');
+            const rows = tbody.querySelectorAll('tr[id^="row-"]');
+            if (rows.length === 0) {
+                document.getElementById('emptyStateRow').style.display = '';
+            }
+        }
+
+        function formatInfoCell(title, author, publisher) {
+            if (!title && !author && !publisher) return '<span class="text-gray-400 italic">無內容</span>';
+            const pubBadge = publisher ? `<span class="inline-block mt-1.5 px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs border border-blue-200">${publisher}</span>` : '';
+            const authorTxt = author ? `<span class="text-sm text-gray-600">${author}</span>` : '<span class="text-sm text-gray-400 italic">作者未知</span>';
+            return `<div class="font-bold text-gray-900 text-base leading-tight">${title || '未知名稱'}</div><div class="mt-1">${authorTxt}</div>${pubBadge}`;
+        }
+
+        function editRow(rowId) {
+            const tr = document.getElementById(rowId);
+            if (!tr || tr.dataset.isEditing === "true") return;
+            tr.dataset.isEditing = "true";
+
+            const infoTd = tr.querySelector('.info-cell');
+            const title = tr.dataset.title || '';
+            const author = tr.dataset.author || '';
+            const publisher = tr.dataset.publisher || '';
+
+            infoTd.innerHTML = `
+                <div class="flex flex-col space-y-1.5">
+                    <input type="text" id="edit-title-${rowId}" value="${title.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="書名 / 期刊名">
+                    <input type="text" id="edit-author-${rowId}" value="${author.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="作者 (選填)">
+                    <input type="text" id="edit-publisher-${rowId}" value="${publisher.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="出版社 (選填)">
+                </div>
+            `;
+
+            const actionTd = tr.querySelector('.action-cell');
+            tr.dataset.originalActions = actionTd.innerHTML;
+            
+            actionTd.innerHTML = `
+                <div class="flex flex-col items-end space-y-1.5">
+                    <button onclick="saveRow('${rowId}')" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded w-full transition-colors shadow-sm font-bold flex justify-center items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>儲存
+                    </button>
+                    <button onclick="cancelEdit('${rowId}')" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded w-full transition-colors shadow-sm flex justify-center items-center">
+                        取消
+                    </button>
+                </div>
+            `;
+        }
+
+        function saveRow(rowId) {
+            const tr = document.getElementById(rowId);
+            if (!tr) return;
+            
+            const newTitle = document.getElementById(`edit-title-${rowId}`).value.trim();
+            const newAuthor = document.getElementById(`edit-author-${rowId}`).value.trim();
+            const newPublisher = document.getElementById(`edit-publisher-${rowId}`).value.trim();
+            
+            tr.dataset.title = newTitle;
+            tr.dataset.author = newAuthor;
+            tr.dataset.publisher = newPublisher;
+            tr.dataset.isEditing = "false";
+            tr.dataset.isError = "false"; 
+            
+            const infoTd = tr.querySelector('.info-cell');
+            infoTd.innerHTML = formatInfoCell(newTitle, newAuthor, newPublisher);
+            
+            const actionTd = tr.querySelector('.action-cell');
+            actionTd.innerHTML = tr.dataset.originalActions;
+            
+            const sourceTd = tr.querySelector('.source-cell');
+            sourceTd.innerHTML = `<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold shadow-sm">手動編輯</span>`;
+            
+            showToast('資料已成功更新');
+        }
+
+        function cancelEdit(rowId) {
+            const tr = document.getElementById(rowId);
+            if (!tr) return;
+            tr.dataset.isEditing = "false";
+            
+            const infoTd = tr.querySelector('.info-cell');
+            if (tr.dataset.isError === "true") {
+                infoTd.innerHTML = '<span class="text-red-500 font-medium">查無資料或格式錯誤，請手動編輯</span>';
+            } else {
+                infoTd.innerHTML = formatInfoCell(tr.dataset.title, tr.dataset.author, tr.dataset.publisher);
+            }
+            
+            const actionTd = tr.querySelector('.action-cell');
+            actionTd.innerHTML = tr.dataset.originalActions;
+        }
+
+        // ==========================================
+        // 3. 網路代理與爬蟲引擎
+        // ==========================================
+
+        async function fetchHtml(targetUrl) {
+            let lastError = "";
+            try {
+                let res = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`);
+                if (res.ok) return await res.text();
+                lastError = "CodeTabs: " + res.status;
+            } catch(e) { lastError = e.message; }
+            
+            try {
+                let res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                if (res.ok) {
+                    let data = await res.json();
+                    if (data.contents) return data.contents;
+                }
+                lastError += " | AllOrigins: " + res.status;
+            } catch(e) { lastError += " | AllOrigins 錯誤: " + e.message; }
+            throw new Error("代理伺服器皆無回應: " + lastError);
+        }
+
+        async function scrapeIsbnSearch(isbn) {
+            try {
+                const targetUrl = `https://isbnsearch.org/isbn/${isbn}`;
+                const html = await fetchHtml(targetUrl);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const titleEl = doc.querySelector('h1');
+                
+                if (titleEl) {
+                    let title = titleEl.innerText.trim();
+                    const isBotCheck = title.toLowerCase().includes('verify') || 
+                                       title.toLowerCase().includes('just a moment') || 
+                                       title === 'ISBN Search';
+                                       
+                    if (title && !isBotCheck) {
+                        let author = ''; let publisher = '';
+                        doc.querySelectorAll('strong').forEach(tag => {
+                            const parent = tag.parentElement;
+                            if (parent) {
+                                const text = parent.innerText;
+                                if (text.includes('Authors:')) author = text.replace('Authors:', '').trim();
+                                else if (text.includes('Publisher:')) publisher = text.replace('Publisher:', '').trim();
+                            }
+                        });
+                        return { title, author, publisher, source: 'ISBNSearch' };
+                    }
+                }
+            } catch (e) { console.log("ISBNSearch 失敗", e); }
+            return null;
+        }
+
+        async function scrapeSanmin(isbn) {
+            try {
+                const targetUrl = `https://www.sanmin.com.tw/search/index/?ct=K&qu=${isbn}`;
+                const html = await fetchHtml(targetUrl);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const titleEl = doc.querySelector('h3.title a') || doc.querySelector('.resultBooks h3 a');
+                if (titleEl && titleEl.innerText.trim()) {
+                    const authorEl = doc.querySelector('.author a') || doc.querySelector('.author');
+                    const pubEl = doc.querySelector('.publisher a') || doc.querySelector('.publisher');
+                    return { 
+                        title: titleEl.innerText.trim(), 
+                        author: authorEl ? authorEl.innerText.replace('作者：', '').trim() : '', 
+                        publisher: pubEl ? pubEl.innerText.replace('出版社：', '').replace('出版單位：', '').trim() : '', 
+                        source: '三民' 
+                    };
+                }
+            } catch (e) { console.log("三民失敗", e); }
+            return null;
+        }
+
+        async function scrapeBooks(isbn) {
+            try {
+                const targetUrl = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
+                const html = await fetchHtml(targetUrl);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const titleEl = doc.querySelector('.table-td h4 a') || doc.querySelector('.box_1 h3 a') || doc.querySelector('.type02_p002 h1') || doc.querySelector('h4 a[title]');
+                if (titleEl && titleEl.innerText.trim()) {
+                    const authorEl = doc.querySelector('.table-td p.author a') || doc.querySelector('p.author a') || doc.querySelector('.type02_p003 a');
+                    const pubEl = doc.querySelector('a[rel="mid_publish"]') || doc.querySelector('a[href*="sys_pubid"]');
+                    return { 
+                        title: titleEl.innerText.trim(), 
+                        author: authorEl ? authorEl.innerText.trim() : '', 
+                        publisher: pubEl ? pubEl.innerText.trim() : '', 
+                        source: '博客來' 
+                    };
+                }
+            } catch (e) { console.log("博客來失敗", e); }
+            return null;
+        }
+
+        async function scrapeNDHU(code, type = 'ISBN') {
+            try {
+                const targetUrl = `https://books-lib.ndhu.edu.tw/toread/opac/search?q=${code}&search_field=${type}`;
+                const html = await fetchHtml(targetUrl);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                const titleLinks = Array.from(doc.querySelectorAll('a[href*="bibliographic_view"]'));
+                const titleEl = titleLinks.find(a => a.innerText.trim().length > 0) || doc.querySelector('.title a');
+                
+                if (titleEl && titleEl.innerText.trim()) {
+                    let title = titleEl.innerText.replace(/\s*\/\s*$/, '').trim();
+                    
+                    const parentContainer = titleEl.closest('td') || titleEl.closest('div') || doc.body;
+                    const textContent = parentContainer.innerText;
+                    
+                    let author = '';
+                    let publisher = '';
+                    
+                    const authorMatch = textContent.match(/by\s*[:：]\s*([^\n]+)/i);
+                    if (authorMatch) author = authorMatch[1].trim();
+                    
+                    const pubMatch = textContent.match(/出版[者社]?\s*[:：]\s*([^\n]+)/);
+                    if (pubMatch) publisher = pubMatch[1].trim();
+                    
+                    return { title, author, publisher, source: '東華大學' };
+                } 
+                else {
+                    const ths = Array.from(doc.querySelectorAll('th'));
+                    const titleTh = ths.find(th => th.innerText.includes('題名') || th.innerText.includes('標題'));
+                    if (titleTh && titleTh.nextElementSibling) {
+                        return {
+                            title: titleTh.nextElementSibling.innerText.replace(/\s*\/\s*$/, '').trim(),
+                            author: (ths.find(th => th.innerText.includes('作者'))?.nextElementSibling?.innerText || '').replace(/作者[：:]?/, '').trim(),
+                            publisher: (ths.find(th => th.innerText.includes('出版') || th.innerText.includes('發行'))?.nextElementSibling?.innerText || '').replace(/出版[者社]?[：:]?/, '').trim(),
+                            source: '東華大學'
+                        };
+                    }
+                }
+            } catch (e) { console.log("東華大學爬蟲連線失敗", e.message); }
+            return null;
+        }
+
+        // --- 新增：國家圖書館 Aleph 系統爬蟲 ---
+        async function scrapeNCL(code, type = 'ISBN') {
+            try {
+                // 使用無 Session ID 的通用查詢網址格式
+                const findCode = type === 'ISBN' ? 'ISBN' : 'ISSN';
+                const targetUrl = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=${findCode}&request=${code}`;
+                const html = await fetchHtml(targetUrl);
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                
+                // Aleph 系統的書目表格解析
+                const tds = Array.from(doc.querySelectorAll('td.td1'));
+                
+                let title = '';
+                let author = '';
+                let publisher = '';
+                
+                for (let i = 0; i < tds.length; i++) {
+                    const label = tds[i].innerText.trim();
+                    const valueTd = tds[i].nextElementSibling;
+                    
+                    if (!valueTd) continue;
+                    const value = valueTd.innerText.trim();
+                    
+                    if (label.includes('題名')) {
+                        // 移除國圖常見的 "/ 作者" 或 "=" 等標點符號後綴
+                        title = value.split('/')[0].split('=')[0].trim();
+                    } else if (label.includes('作者')) {
+                        author = value.trim();
+                    } else if (label.includes('出版項')) {
+                        // 國圖出版項通常長這樣: "臺北市 : 麥田出版 : 家庭傳媒城邦分公司發行, 2024[民113]"
+                        // 我們嘗試提取中間的出版社名稱
+                        const parts = value.split(':');
+                        if (parts.length > 1) {
+                            publisher = parts[1].split(',')[0].trim();
+                        } else {
+                            publisher = value.split(',')[0].trim();
+                        }
+                    }
+                }
+                
+                if (title) {
+                    return { title, author, publisher, source: '國家圖書館' };
+                } else {
+                    // 如果沒找到 td.td1 表格，可能是列表頁面
+                    const listTitleEl = doc.querySelector('a[href*="func=full-set-set"]');
+                    if (listTitleEl && listTitleEl.innerText.trim()) {
+                        title = listTitleEl.innerText.split('/')[0].split('=')[0].trim();
+                        return { title, author: '', publisher: '', source: '國家圖書館' };
+                    }
+                }
+            } catch (e) { console.log("國家圖書館爬蟲失敗", e.message); }
+            return null;
+        }
+
+        // ==========================================
+        // 4. 核心處理邏輯
+        // ==========================================
+
+        async function processBarcode(code) {
+            if (emptyStateRow) emptyStateRow.style.display = 'none';
+
+            const cleanCode = code.replace(/-/g, '');
+            const rowId = 'row-' + Date.now();
+            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+            let tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = "hover:bg-gray-50 transition-colors";
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">判斷中</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">${code}</td>
+                <td class="px-6 py-4 text-sm text-gray-500 info-cell">
+                    <div class="flex items-center space-x-2">
+                        <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span>全球資料庫檢索中...</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 source-cell"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold">讀取中</span></td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium action-cell"></td>
+            `;
+            resultsTableBody.insertBefore(tr, resultsTableBody.firstChild);
+
+            if (cleanCode.length === 8 || (code.includes('-') && code.length === 9 && cleanCode.length === 8)) {
+                const formattedISSN = cleanCode.substring(0, 4) + '-' + cleanCode.substring(4);
+                await fetchISSN(formattedISSN, rowId, timeStr);
+            } else if (cleanCode.length === 10 || cleanCode.length === 13) {
+                await fetchISBN(cleanCode, rowId, timeStr);
+            } else {
+                updateRow(rowId, timeStr, '未知', code, '<span class="text-red-500 font-medium">格式錯誤，請手動編輯</span>', '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">格式錯誤</span>', 'error', '', { isError: true, title: '', author: '', publisher: '' });
+                playBeep('error');
+            }
+        }
+
+        async function fetchISSN(issn, rowId, timeStr) {
+            const ndhuLink = `https://books-lib.ndhu.edu.tw/toread/opac/search?q=${issn}&search_field=ISSN`;
+            const nclLink = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=ISSN&request=${issn}`;
+            const portalUrl = `https://portal.issn.org/resource/ISSN/${issn}`;
+            
+            const actionHtml = `
+                <div class="flex flex-col items-end space-y-1.5">
+                    <button onclick="copyToClipboard('${issn}'); showToast('條碼 ${issn} 已複製');" class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-300 w-full transition-colors shadow-sm flex justify-center items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        複製條碼
+                    </button>
+                    <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-xs font-medium bg-purple-50 px-2 py-1 rounded w-full text-center border border-purple-100">
+                        東華大學
+                    </a>
+                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded w-full text-center border border-blue-100">
+                        國家圖書館
+                    </a>
+                    <a href="${portalUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium bg-indigo-50 px-2 py-1 rounded w-full text-center border border-indigo-100">
+                        ISSN Portal
+                    </a>
+                </div>
+            `;
+
+            try {
+                let journalTitle = "";
+                let author = "";
+                let publisher = "";
+                let sourceBadge = "";
+                let isSuccess = false;
+
+                // 1. 東華大學圖書館 (第一優先)
+                const ndhuRes = await scrapeNDHU(issn, 'ISSN');
+                if (ndhuRes && ndhuRes.title) {
+                    journalTitle = ndhuRes.title;
+                    author = ndhuRes.author || '';
+                    publisher = ndhuRes.publisher || '';
+                    sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">東華大學</span>`;
+                    isSuccess = true;
+                } 
+                else {
+                    // 2. 國家圖書館 (第二優先)
+                    const nclRes = await scrapeNCL(issn, 'ISSN');
+                    if (nclRes && nclRes.title) {
+                        journalTitle = nclRes.title;
+                        author = nclRes.author || '';
+                        publisher = nclRes.publisher || '';
+                        sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">國家圖書館</span>`;
+                        isSuccess = true;
+                    }
+                    // 3. ISSN Portal (備用防線)
+                    else {
+                        const html = await fetchHtml(portalUrl);
+                        const doc = new DOMParser().parseFromString(html, 'text/html');
+                        const titleTag = doc.querySelector('title');
+                        
+                        if (titleTag && titleTag.innerText) {
+                            const parts = titleTag.innerText.split('|');
+                            journalTitle = parts.length > 1 ? parts[1].trim() : titleTag.innerText.trim();
+                            if (journalTitle !== "查無名稱" && journalTitle !== "ISSN") {
+                                sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">ISSN Portal</span>`;
+                                isSuccess = true;
+                            }
+                        }
+                    }
+                }
+
+                if (isSuccess && journalTitle) {
+                    updateRow(rowId, timeStr, 'ISSN', issn, formatInfoCell(journalTitle, author, publisher), sourceBadge, 'success', actionHtml, { title: journalTitle, author: author, publisher: publisher });
+                    playBeep('success');
+                } else {
+                    const badge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">無資料</span>`;
+                    updateRow(rowId, timeStr, 'ISSN', issn, '<span class="text-red-500 font-medium">查無資料，請使用右側連結查詢或手動編輯</span>', badge, 'warning', actionHtml, { isError: true, title: '', author: '', publisher: '' });
+                    playBeep('error');
+                }
+            } catch (error) {
+                const badge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">錯誤</span>`;
+                updateRow(rowId, timeStr, 'ISSN', issn, '<span class="text-red-500 font-medium">連線失敗，請手動編輯</span>', badge, 'error', actionHtml, { isError: true, title: '', author: '', publisher: '' });
+                playBeep('error');
+            }
+        }
+
+        async function fetchISBN(isbn, rowId, timeStr) {
+            const ndhuLink = `https://books-lib.ndhu.edu.tw/toread/opac/search?q=${isbn}&search_field=ISBN`;
+            const nclLink = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=ISBN&request=${isbn}`;
+            const booksLink = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
+            
+            const actionHtml = `
+                <div class="flex flex-col items-end space-y-1.5">
+                    <button onclick="copyToClipboard('${isbn}'); showToast('條碼 ${isbn} 已複製');" class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-300 w-full transition-colors shadow-sm flex justify-center items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                        複製條碼
+                    </button>
+                    <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-xs font-medium bg-purple-50 px-2 py-1 rounded w-full text-center border border-purple-100">
+                        東華大學
+                    </a>
+                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded w-full text-center border border-blue-100">
+                        國家圖書館
+                    </a>
+                    <a href="${booksLink}" target="_blank" class="text-green-600 hover:text-green-800 text-xs font-medium bg-green-50 px-2 py-1 rounded w-full text-center border border-green-100">
+                        博客來查詢
+                    </a>
+                </div>
+            `;
+
+            let bookData = { title: '', author: '', publisher: '', sources: [] };
+            
+            const hasZH = (str) => /[\u4E00-\u9FA5]/.test(str || '');
+            
+            const isPerfect = () => bookData.title && bookData.author && bookData.publisher && 
+                                  hasZH(bookData.title) && hasZH(bookData.publisher);
+
+            const updateData = (t, a, p, source) => {
+                let updated = false;
+                
+                if (!bookData.title && t) { bookData.title = t; updated = true; }
+                else if (bookData.title && t && !hasZH(bookData.title) && hasZH(t)) { bookData.title = t; updated = true; }
+                
+                if (!bookData.author && a) { bookData.author = a; updated = true; }
+                else if (bookData.author && a && !hasZH(bookData.author) && hasZH(a)) { bookData.author = a; updated = true; }
+                
+                if (!bookData.publisher && p) { bookData.publisher = p; updated = true; }
+                else if (bookData.publisher && p && !hasZH(bookData.publisher) && hasZH(p)) { bookData.publisher = p; updated = true; }
+                
+                if (updated && source && !bookData.sources.includes(source)) bookData.sources.push(source);
+            };
+
+            const translatePinyin = (str) => {
+                if (!str || hasZH(str)) return str;
+                const searchStr = str.toLowerCase().trim();
+                return customPinyinDict[searchStr] || BASE_PINYIN_DICTIONARY[searchStr] || str;
+            };
+
+            try {
+                // 1. 東華大學圖書館
+                if (!isPerfect()) {
+                    const res = await scrapeNDHU(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                // 2. 國家圖書館 (新增)
+                if (!isPerfect()) {
+                    const res = await scrapeNCL(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                // 3. ISBNSearch 
+                if (!isPerfect()) {
+                    const res = await scrapeIsbnSearch(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                // 4. Google Books
+                if (!isPerfect()) {
+                    const res = await scrapeNDHU(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                if (!isPerfect()) {
+                    const res = await scrapeIsbnSearch(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                if (!isPerfect()) {
+                    try {
+                        let res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+                        let data = await res.json();
+                        if (!data.items) {
+                            res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${isbn}`);
+                            data = await res.json();
+                        }
+                        if (data.items) {
+                            const info = data.items[0].volumeInfo;
+                            updateData(info.title, info.authors?.join(', '), info.publisher, 'Google');
+                        }
+                    } catch (e) {}
+                }
+
+                if (!isPerfect()) {
+                    try {
+                        const res = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`);
+                        const data = await res.json();
+                        if (data[`ISBN:${isbn}`]) {
+                            const info = data[`ISBN:${isbn}`];
+                            updateData(info.title, info.authors?.map(a=>a.name).join(', '), info.publishers?.map(p=>p.name).join(', '), 'OpenLib');
+                        }
+                    } catch (e) {}
+                }
+
+                if (!isPerfect()) {
+                    const res = await scrapeSanmin(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                if (!isPerfect()) {
+                    const res = await scrapeBooks(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
+                }
+
+                if (bookData.title) {
+                    bookData.publisher = translatePinyin(bookData.publisher);
+
+                    const displayTxt = formatInfoCell(bookData.title, bookData.author, bookData.publisher);
+                    const sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">${bookData.sources.join(' + ')}</span>`;
+                    
+                    updateRow(rowId, timeStr, 'ISBN', isbn, displayTxt, sourceBadge, 'success', actionHtml, { title: bookData.title, author: bookData.author, publisher: bookData.publisher });
+                    playBeep('success');
+                } else {
+                    updateRow(rowId, timeStr, 'ISBN', isbn, '<span class="text-red-500 font-medium">查無資料，請使用右側連結查詢或手動編輯</span>', '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">無資料</span>', 'warning', actionHtml, { isError: true, title: '', author: '', publisher: '' });
+                    playBeep('error');
+                }
+
+            } catch (error) {
+                updateRow(rowId, timeStr, 'ISBN', isbn, '<span class="text-red-500 font-medium">處理資料時發生意外錯誤，請手動編輯</span>', '<span class="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-semibold">錯誤</span>', 'error', actionHtml, { isError: true, title: '', author: '', publisher: '' });
+                playBeep('error');
+            }
+        }
+
+        function updateRow(rowId, timeStr, type, code, infoHtml, statusBadge, statusType, actionHtml, rawData = null) {
+            const tr = document.getElementById(rowId);
+            if (!tr) return;
+            const typeColor = type === 'ISBN' ? 'text-blue-700 bg-blue-50 border-blue-200' : (type === 'ISSN' ? 'text-purple-700 bg-purple-50 border-purple-200' : 'text-gray-700 bg-gray-50 border-gray-200');
+            
+            if (rawData) {
+                tr.dataset.title = rawData.title || '';
+                tr.dataset.author = rawData.author || '';
+                tr.dataset.publisher = rawData.publisher || '';
+                tr.dataset.isError = rawData.isError ? "true" : "false";
+            } else {
+                tr.dataset.title = ''; tr.dataset.author = ''; tr.dataset.publisher = ''; tr.dataset.isError = "false";
+            }
+
+            const editDeleteHtml = `
+                <div class="mt-2 flex justify-between space-x-1 border-t pt-2 border-gray-100">
+                    <button onclick="editRow('${rowId}')" class="text-xs bg-yellow-50 hover:bg-yellow-100 text-yellow-700 px-2 py-1.5 rounded border border-yellow-200 flex-1 transition-colors shadow-sm">編輯</button>
+                    <button onclick="deleteRow('${rowId}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1.5 rounded border border-red-200 flex-1 transition-colors shadow-sm">刪除</button>
+                </div>
+            `;
+            const finalActionHtml = actionHtml ? actionHtml + editDeleteHtml : editDeleteHtml;
+
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                    <span class="px-2.5 py-1 rounded border shadow-sm ${typeColor}">${type}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-800 bg-gray-50 font-bold">${code}</td>
+                <td class="px-6 py-4 text-sm text-gray-800 info-cell">${infoHtml}</td>
+                <td class="px-6 py-4 text-sm source-cell">${statusBadge}</td>
+                <td class="px-6 py-4 text-right action-cell">${finalActionHtml}</td>
+            `;
+        }
+
+        // ==========================================
+        // 5. 匯出功能 (CSV)
+        // ==========================================
+
         function exportToCSV() {
             const rows = document.querySelectorAll('#resultsTableBody tr');
-            let csvContent = '\uFEFF'; 
-            csvContent += '時間,類型,條碼,名稱與資訊,狀態\n';
-
+            let csvContent = '\uFEFF時間,類型,條碼,書名與資訊,資料來源\n';
             let hasData = false;
+
             rows.forEach(row => {
                 if (row.id === 'emptyStateRow' && row.style.display !== 'none') return;
-                
                 const cols = row.querySelectorAll('td');
                 if (cols.length >= 5) {
                     const time = cols[0].innerText.trim();
@@ -271,300 +910,92 @@
             });
 
             if (!hasData) {
-                showToast('目前沒有資料可以匯出');
+                showToast('目前沒有有效資料可以匯出');
                 return;
             }
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.setAttribute('href', url);
-            const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, '');
-            link.setAttribute('download', `條碼掃描紀錄_${dateStr}.csv`);
+            link.href = url;
+            link.download = `條碼掃描紀錄_${new Date().toISOString().slice(0,10).replace(/-/g, '')}.csv`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
 
-        // 代理伺服器容錯切換機制
-        async function fetchHtml(targetUrl) {
-            let lastError = "";
-            try {
-                let res = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`);
-                if (res.ok) return await res.text();
-                lastError = "CodeTabs 狀態碼: " + res.status;
-            } catch(e) { lastError = e.message; }
+        // ==========================================
+        // 6. 自訂字典管理功能
+        // ==========================================
+        
+        function openDictModal() {
+            document.getElementById('dictModal').classList.remove('hidden');
+            renderDictList();
+        }
+
+        function closeDictModal() {
+            document.getElementById('dictModal').classList.add('hidden');
+            document.getElementById('newPinyin').value = '';
+            document.getElementById('newZh').value = '';
+        }
+
+        function renderDictList() {
+            const tbody = document.getElementById('dictTableBody');
+            tbody.innerHTML = '';
             
-            try {
-                let res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
-                if (res.ok) {
-                    let data = await res.json();
-                    if (data.contents) return data.contents;
-                }
-                lastError += " | AllOrigins 狀態碼: " + res.status;
-            } catch(e) { lastError += " | AllOrigins 錯誤: " + e.message; }
+            const entries = [];
             
-            throw new Error("所有代理伺服器皆被阻擋或無回應: " + lastError);
-        }
-
-        // 台灣本土書店爬蟲 (三民)
-        async function scrapeSanmin(isbn) {
-            try {
-                const targetUrl = `https://www.sanmin.com.tw/search/index/?ct=K&qu=${isbn}`;
-                const html = await fetchHtml(targetUrl);
-                
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                const titleEl = doc.querySelector('h3.title a') || doc.querySelector('.resultBooks h3 a');
-                const authorEl = doc.querySelector('.author a') || doc.querySelector('.author');
-                const pubEl = doc.querySelector('.publisher a') || doc.querySelector('.publisher');
-                
-                if (titleEl && titleEl.innerText.trim()) {
-                    let title = titleEl.innerText.trim();
-                    let author = authorEl ? authorEl.innerText.trim().replace('作者：', '').trim() : '';
-                    let publisher = pubEl ? pubEl.innerText.trim().replace('出版社：', '').replace('出版單位：', '').trim() : '';
-                    return { title, author, publisher, source: '三民' };
-                }
-            } catch (e) { console.log("三民爬蟲失敗:", e.message); }
-            return null;
-        }
-
-        // 台灣本土書店爬蟲 (博客來)
-        async function scrapeBooks(isbn) {
-            try {
-                const targetUrl = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
-                const html = await fetchHtml(targetUrl);
-                
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                const titleEl = doc.querySelector('.table-td h4 a') || doc.querySelector('.box_1 h3 a') || doc.querySelector('h4 a[title]') || doc.querySelector('.type02_p002 h1');
-                const authorEl = doc.querySelector('.table-td p.author a') || doc.querySelector('p.author a') || doc.querySelector('.type02_p003 a');
-                const pubEl = doc.querySelector('a[rel="mid_publish"]') || doc.querySelector('a[href*="sys_pubid"]');
-                
-                if (titleEl && titleEl.innerText.trim()) {
-                    let title = titleEl.innerText.trim();
-                    let author = authorEl ? authorEl.innerText.trim() : '';
-                    let publisher = pubEl ? pubEl.innerText.trim() : '';
-                    return { title, author, publisher, source: '博客來' };
-                }
-            } catch (e) { console.log("博客來爬蟲失敗:", e.message); }
-            return null;
-        }
-
-        // 處理並辨識條碼
-        async function processBarcode(code) {
-            if (emptyStateRow) {
-                emptyStateRow.style.display = 'none';
+            for (const [pinyin, zh] of Object.entries(customPinyinDict)) {
+                entries.push({ pinyin, zh, isCustom: true });
             }
-
-            const cleanCode = code.replace(/-/g, '');
-            const rowId = 'row-' + Date.now();
-            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-
-            let tr = document.createElement('tr');
-            tr.id = rowId;
-            tr.className = "hover:bg-gray-50 transition-colors";
-            tr.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">判斷中</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-700">${code}</td>
-                <td class="px-6 py-4 text-sm text-gray-500">
-                    <div class="flex items-center space-x-2">
-                        <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>網路查詢中...</span>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">讀取中</span></td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"></td>
-            `;
-            resultsTableBody.insertBefore(tr, resultsTableBody.firstChild);
-
-            if (cleanCode.length === 8 || (code.includes('-') && code.length === 9 && cleanCode.length === 8)) {
-                const formattedISSN = cleanCode.substring(0, 4) + '-' + cleanCode.substring(4);
-                await fetchISSN(formattedISSN, rowId, timeStr);
-            } else if (cleanCode.length === 10 || cleanCode.length === 13) {
-                await fetchISBN(cleanCode, rowId, timeStr);
-            } else {
-                updateRow(rowId, timeStr, '未知', code, '條碼長度不符合標準 ISBN 或 ISSN', '錯誤', 'error', '');
-                playBeep('error');
-            }
-        }
-
-        // 查詢 ISSN
-        async function fetchISSN(issn, rowId, timeStr) {
-            const targetUrl = `https://portal.issn.org/resource/ISSN/${issn}`;
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-
-            try {
-                const response = await fetch(proxyUrl);
-                const data = await response.json();
-                
-                if (data.contents) {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(data.contents, 'text/html');
-                    const titleTag = doc.querySelector('title');
-                    let journalTitle = "查無名稱";
-                    
-                    if (titleTag && titleTag.innerText) {
-                        const parts = titleTag.innerText.split('|');
-                        journalTitle = parts.length > 1 ? parts[1].trim() : titleTag.innerText.trim();
-                    }
-
-                    const actionHtml = `
-                        <a href="${targetUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-900 inline-flex items-center">
-                            查看 ISSN Portal <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                        </a>
-                    `;
-                    updateRow(rowId, timeStr, 'ISSN', issn, `<span class="font-bold text-gray-900">${journalTitle}</span>`, '成功', 'success', actionHtml);
-                    playBeep('success');
-                } else {
-                    throw new Error("Empty contents");
-                }
-            } catch (error) {
-                const actionHtml = `<a href="${targetUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-900">手動查詢</a>`;
-                updateRow(rowId, timeStr, 'ISSN', issn, '連線失敗或查無資料', '失敗', 'error', actionHtml);
-                playBeep('error');
-            }
-        }
-
-        // 查詢 ISBN
-        async function fetchISBN(isbn, rowId, timeStr) {
-            const nclLink = `https://isbn.ncl.edu.tw/NEW_ISBNNet/main_Webpage_Normal.php?PCODE=Search&type=B&val=${isbn}`;
-            const booksLink = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
             
-            const actionHtml = `
-                <div class="flex flex-col items-end space-y-1">
-                    <button onclick="copyToClipboard('${isbn}'); showToast('條碼 ${isbn} 已複製，請在網頁貼上查詢。')" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded border border-gray-300 w-full mb-1 transition-colors">
-                        📋 複製條碼
-                    </button>
-                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-900 inline-flex items-center text-xs font-medium">
-                        國圖查詢 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </a>
-                    <a href="${booksLink}" target="_blank" class="text-green-600 hover:text-green-900 inline-flex items-center text-xs font-medium mt-1">
-                        博客來查詢 <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </a>
-                </div>
-            `;
-
-            let bookData = { title: '', author: '', publisher: '', sources: [] };
-            const isComplete = () => bookData.title && bookData.author && bookData.publisher;
-
-            const updateBookData = (newTitle, newAuthor, newPublisher, sourceName) => {
-                let updated = false;
-                if (!bookData.title && newTitle) { bookData.title = newTitle; updated = true; }
-                if (!bookData.author && newAuthor) { bookData.author = newAuthor; updated = true; }
-                if (!bookData.publisher && newPublisher) { bookData.publisher = newPublisher; updated = true; }
-                if (updated && sourceName && !bookData.sources.includes(sourceName)) {
-                    bookData.sources.push(sourceName);
+            for (const [pinyin, zh] of Object.entries(BASE_PINYIN_DICTIONARY)) {
+                if (!customPinyinDict[pinyin]) {
+                    entries.push({ pinyin, zh, isCustom: false });
                 }
-            };
-
-            try {
-                // 1. Google Books API
-                try {
-                    let gBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`;
-                    let gRes = await fetch(gBooksUrl);
-                    let gData = await gRes.json();
-
-                    if (!gData.items || gData.items.length === 0) {
-                        gBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=${isbn}`;
-                        gRes = await fetch(gBooksUrl);
-                        gData = await gRes.json();
-                    }
-
-                    if (gData.items && gData.items.length > 0) {
-                        const info = gData.items[0].volumeInfo;
-                        updateBookData(
-                            info.title || '', 
-                            info.authors ? info.authors.join(', ') : '', 
-                            info.publisher || '', 
-                            'Google'
-                        );
-                    }
-                } catch (e) { console.log("Google 查詢失敗", e); }
-
-                // 2. Open Library API
-                if (!isComplete()) {
-                    try {
-                        const olUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`;
-                        const olRes = await fetch(olUrl);
-                        const olData = await olRes.json();
-                        const key = `ISBN:${isbn}`;
-
-                        if (olData[key]) {
-                            const info = olData[key];
-                            updateBookData(
-                                info.title || '', 
-                                info.authors ? info.authors.map(a => a.name).join(', ') : '', 
-                                info.publishers ? info.publishers.map(p => p.name).join(', ') : '', 
-                                'OpenLib'
-                            );
-                        }
-                    } catch (e) { console.log("Open Library 查詢失敗", e); }
-                }
-
-                // 3. 三民
-                if (!isComplete()) {
-                    const sanminData = await scrapeSanmin(isbn);
-                    if (sanminData) {
-                        updateBookData(sanminData.title, sanminData.author, sanminData.publisher, sanminData.source);
-                    }
-                }
-
-                // 4. 博客來
-                if (!isComplete()) {
-                    const booksData = await scrapeBooks(isbn);
-                    if (booksData) {
-                        updateBookData(booksData.title, booksData.author, booksData.publisher, booksData.source);
-                    }
-                }
-
-                // 結果顯示
-                if (bookData.title) {
-                    const pubBadge = bookData.publisher ? `<span class="inline-block mt-1 ml-2 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-200">${bookData.publisher}</span>` : '';
-                    const displayTxt = `<span class="font-bold text-gray-900">${bookData.title}</span> <br><span class="text-xs text-gray-500">${bookData.author || '未知作者'}</span> ${pubBadge}`;
-                    const sourceText = `成功 (${bookData.sources.join('+')})`;
-                    
-                    updateRow(rowId, timeStr, 'ISBN', isbn, displayTxt, sourceText, 'success', actionHtml);
-                    playBeep('success');
-                } else {
-                    updateRow(rowId, timeStr, 'ISBN', isbn, '<span class="text-red-500">查無此書，請點擊右側連結手動查詢</span>', '無資料', 'warning', actionHtml);
-                    playBeep('error');
-                }
-
-            } catch (error) {
-                updateRow(rowId, timeStr, 'ISBN', isbn, '處理資料時發生意外錯誤', '錯誤', 'error', actionHtml);
-                playBeep('error');
             }
+
+            entries.sort((a, b) => a.pinyin.localeCompare(b.pinyin));
+
+            entries.forEach(entry => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-800 font-mono">${entry.pinyin}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-800 font-bold">${entry.zh}</td>
+                    <td class="px-4 py-2 whitespace-nowrap text-right text-sm">
+                        ${entry.isCustom 
+                            ? `<button onclick="removeDictEntry('${entry.pinyin}')" class="text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors font-semibold">刪除</button>` 
+                            : `<span class="text-gray-400 text-xs px-2 py-1 bg-gray-50 rounded">系統內建</span>`}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
         }
 
-        // 更新 UI
-        function updateRow(rowId, timeStr, type, code, infoHtml, statusText, statusType, actionHtml) {
-            const tr = document.getElementById(rowId);
-            if (!tr) return;
-
-            let statusBadge = '';
-            if (statusType === 'success') {
-                statusBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">${statusText}</span>`;
-            } else if (statusType === 'error') {
-                statusBadge = `<span class="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">${statusText}</span>`;
-            } else {
-                statusBadge = `<span class="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-semibold">${statusText}</span>`;
+        function addDictEntry() {
+            let pinyin = document.getElementById('newPinyin').value.trim().toLowerCase();
+            let zh = document.getElementById('newZh').value.trim();
+            
+            if (!pinyin || !zh) {
+                showToast('請完整輸入拼音及繁體中文名稱');
+                return;
             }
 
-            const typeColor = type === 'ISBN' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-purple-600 bg-purple-50 border-purple-200';
+            customPinyinDict[pinyin] = zh;
+            localStorage.setItem('customPinyinDict', JSON.stringify(customPinyinDict));
+            
+            document.getElementById('newPinyin').value = '';
+            document.getElementById('newZh').value = '';
+            
+            renderDictList();
+            showToast('已成功加入字典！');
+        }
 
-            tr.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
-                    <span class="px-2 py-1 rounded border ${typeColor}">${type}</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-800">${code}</td>
-                <td class="px-6 py-4 text-sm text-gray-800">${infoHtml}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${statusBadge}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">${actionHtml}</td>
-            `;
+        function removeDictEntry(pinyin) {
+            delete customPinyinDict[pinyin];
+            localStorage.setItem('customPinyinDict', JSON.stringify(customPinyinDict));
+            renderDictList();
+            showToast('已移除自訂字典項目');
         }
     </script>
 </body>
