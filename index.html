@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 html5-qrcode 用於相機掃描 -->
     <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- 引入 pinyin-pro 用於中文字轉拼音 -->
+    <script src="https://unpkg.com/pinyin-pro"></script>
     <style>
         td { vertical-align: middle; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -25,7 +27,7 @@
                 <p class="text-gray-500 text-sm">支援 ISBN (書籍) 與 ISSN (期刊) 自動判別、跨國庫補完與手動編輯</p>
             </div>
             <div class="mt-4 md:mt-0 text-right">
-                <p class="text-xs text-gray-400">來源：東華大學, ISBNSearch, Google, Open Library, 三民, 博客來, ISSN Portal</p>
+                <p class="text-xs text-gray-400">來源：東華大學, 國圖, ISBNSearch, Google, Open Library, 三民, 博客來, ISSN Portal</p>
                 <div class="mt-2 flex flex-wrap justify-end gap-2 items-center">
                     <button onclick="openDictModal()" class="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm">
                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
@@ -193,6 +195,39 @@
         // 從 LocalStorage 載入使用者透過 UI 自訂的字典
         let customPinyinDict = JSON.parse(localStorage.getItem('customPinyinDict')) || {};
 
+        // --- 修改：動態建立與更新出版社自動完成清單 (Datalist) ---
+        function updatePublisherSuggestions() {
+            let datalist = document.getElementById('publisher-suggestions');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'publisher-suggestions';
+                document.body.appendChild(datalist);
+            }
+            datalist.innerHTML = ''; // 清空重建
+            
+            const combinedDict = { ...BASE_PINYIN_DICTIONARY, ...customPinyinDict };
+            // 載入純粹用於自動完成的使用者歷史紀錄 (不汙染拼音字典)
+            const userPublishers = JSON.parse(localStorage.getItem('userPublishers')) || [];
+            
+            // 合併內建字典、自訂字典與手動輸入過的出版社，並確保不重複
+            const uniquePublishers = new Set([...Object.values(combinedDict), ...userPublishers]);
+            
+            for (const zh of uniquePublishers) {
+                const option = document.createElement('option');
+                option.value = zh;
+                
+                // 如果在字典中有對應的拼音，將其設為 text 讓部分瀏覽器支援拼音搜尋
+                const pinyinKey = Object.keys(combinedDict).find(key => combinedDict[key] === zh);
+                if (pinyinKey && !/[\u4E00-\u9FA5]/.test(pinyinKey)) {
+                    option.text = pinyinKey;
+                }
+                
+                datalist.appendChild(option);
+            }
+        }
+        // 初始化載入時呼叫一次
+        updatePublisherSuggestions();
+
         const barcodeInput = document.getElementById('barcodeInput');
         const resultsTableBody = document.getElementById('resultsTableBody');
         const emptyStateRow = document.getElementById('emptyStateRow');
@@ -337,11 +372,12 @@
             const author = tr.dataset.author || '';
             const publisher = tr.dataset.publisher || '';
 
+            // 修改：在出版社輸入框加入 list="publisher-suggestions" 屬性來啟動自動完成
             infoTd.innerHTML = `
                 <div class="flex flex-col space-y-1.5">
                     <input type="text" id="edit-title-${rowId}" value="${title.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="書名 / 期刊名">
                     <input type="text" id="edit-author-${rowId}" value="${author.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="作者 (選填)">
-                    <input type="text" id="edit-publisher-${rowId}" value="${publisher.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="出版社 (選填)">
+                    <input type="text" id="edit-publisher-${rowId}" value="${publisher.replace(/"/g, '&quot;')}" list="publisher-suggestions" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="出版社 (選填，支援自動完成)">
                 </div>
             `;
 
@@ -367,6 +403,7 @@
             const newTitle = document.getElementById(`edit-title-${rowId}`).value.trim();
             const newAuthor = document.getElementById(`edit-author-${rowId}`).value.trim();
             const newPublisher = document.getElementById(`edit-publisher-${rowId}`).value.trim();
+            const oldPublisher = tr.dataset.publisher || ''; 
             
             tr.dataset.title = newTitle;
             tr.dataset.author = newAuthor;
@@ -383,6 +420,59 @@
             const sourceTd = tr.querySelector('.source-cell');
             sourceTd.innerHTML = `<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold shadow-sm">手動編輯</span>`;
             
+            const hasZH = (str) => /[\u4E00-\u9FA5]/.test(str || '');
+
+            // --- 智慧型字典學習機制 ---
+            if (newPublisher) {
+                if (oldPublisher && !hasZH(oldPublisher) && hasZH(newPublisher)) {
+                    const pinyinKey = oldPublisher.toLowerCase().trim();
+                    if (!customPinyinDict[pinyinKey]) {
+                        customPinyinDict[pinyinKey] = newPublisher;
+                        localStorage.setItem('customPinyinDict', JSON.stringify(customPinyinDict));
+                        renderDictList();
+                        updatePublisherSuggestions();
+                        showToast(`已自動將拼音「${pinyinKey}」對應至「${newPublisher}」並加入字典！`);
+                        return;
+                    }
+                } 
+                else if (hasZH(newPublisher)) {
+                    const combinedDict = { ...BASE_PINYIN_DICTIONARY, ...customPinyinDict };
+                    const existingPublishers = Object.values(combinedDict);
+                    
+                    if (!existingPublishers.includes(newPublisher)) {
+                        try {
+                            if (window.pinyinPro) {
+                                const { pinyin } = window.pinyinPro;
+                                const generatedPinyin = pinyin(newPublisher, { toneType: 'none' }).toLowerCase();
+                                
+                                if (generatedPinyin && !customPinyinDict[generatedPinyin]) {
+                                    customPinyinDict[generatedPinyin] = newPublisher;
+                                    localStorage.setItem('customPinyinDict', JSON.stringify(customPinyinDict));
+                                    renderDictList();
+                                    updatePublisherSuggestions();
+                                    showToast(`已推算拼音「${generatedPinyin}」並將「${newPublisher}」加入字典！`);
+                                    return;
+                                }
+                            } else {
+                                console.warn('pinyin-pro 套件尚未載入，無法自動轉換拼音。');
+                            }
+                        } catch (err) {
+                            console.error('拼音轉換失敗', err);
+                        }
+                    }
+                }
+                
+                let userPublishers = JSON.parse(localStorage.getItem('userPublishers')) || [];
+                const combinedDict = { ...BASE_PINYIN_DICTIONARY, ...customPinyinDict };
+                const allKnownPublishers = [...Object.values(combinedDict), ...userPublishers];
+                
+                if (!allKnownPublishers.includes(newPublisher)) {
+                    userPublishers.push(newPublisher);
+                    localStorage.setItem('userPublishers', JSON.stringify(userPublishers));
+                    updatePublisherSuggestions();
+                }
+            }
+
             showToast('資料已成功更新');
         }
 
@@ -504,9 +594,16 @@
                 const titleLinks = Array.from(doc.querySelectorAll('a[href*="bibliographic_view"]'));
                 const titleEl = titleLinks.find(a => a.innerText.trim().length > 0) || doc.querySelector('.title a');
                 
+                const cleanOpacPublisher = (rawStr) => {
+                    if (!rawStr) return '';
+                    let cleaned = rawStr.split(',')[0].trim();
+                    const parts = cleaned.split(':');
+                    if (parts.length > 1) cleaned = parts[parts.length - 1].trim();
+                    return cleaned.replace(/[,/;\s]+$/, '');
+                };
+
                 if (titleEl && titleEl.innerText.trim()) {
                     let title = titleEl.innerText.replace(/\s*\/\s*$/, '').trim();
-                    
                     const parentContainer = titleEl.closest('td') || titleEl.closest('div') || doc.body;
                     const textContent = parentContainer.innerText;
                     
@@ -517,7 +614,9 @@
                     if (authorMatch) author = authorMatch[1].trim();
                     
                     const pubMatch = textContent.match(/出版[者社]?\s*[:：]\s*([^\n]+)/);
-                    if (pubMatch) publisher = pubMatch[1].trim();
+                    if (pubMatch) {
+                        publisher = cleanOpacPublisher(pubMatch[1]);
+                    }
                     
                     return { title, author, publisher, source: '東華大學' };
                 } 
@@ -525,10 +624,12 @@
                     const ths = Array.from(doc.querySelectorAll('th'));
                     const titleTh = ths.find(th => th.innerText.includes('題名') || th.innerText.includes('標題'));
                     if (titleTh && titleTh.nextElementSibling) {
+                        let rawPub = (ths.find(th => th.innerText.includes('出版') || th.innerText.includes('發行'))?.nextElementSibling?.innerText || '').replace(/出版[者社]?[：:]?/, '').trim();
+                        
                         return {
                             title: titleTh.nextElementSibling.innerText.replace(/\s*\/\s*$/, '').trim(),
                             author: (ths.find(th => th.innerText.includes('作者'))?.nextElementSibling?.innerText || '').replace(/作者[：:]?/, '').trim(),
-                            publisher: (ths.find(th => th.innerText.includes('出版') || th.innerText.includes('發行'))?.nextElementSibling?.innerText || '').replace(/出版[者社]?[：:]?/, '').trim(),
+                            publisher: cleanOpacPublisher(rawPub),
                             source: '東華大學'
                         };
                     }
@@ -537,37 +638,27 @@
             return null;
         }
 
-        // --- 新增：國家圖書館 Aleph 系統爬蟲 ---
         async function scrapeNCL(code, type = 'ISBN') {
             try {
-                // 使用無 Session ID 的通用查詢網址格式
                 const findCode = type === 'ISBN' ? 'ISBN' : 'ISSN';
                 const targetUrl = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=${findCode}&request=${code}`;
                 const html = await fetchHtml(targetUrl);
                 const doc = new DOMParser().parseFromString(html, 'text/html');
                 
-                // Aleph 系統的書目表格解析
                 const tds = Array.from(doc.querySelectorAll('td.td1'));
-                
-                let title = '';
-                let author = '';
-                let publisher = '';
+                let title = ''; let author = ''; let publisher = '';
                 
                 for (let i = 0; i < tds.length; i++) {
                     const label = tds[i].innerText.trim();
                     const valueTd = tds[i].nextElementSibling;
-                    
                     if (!valueTd) continue;
                     const value = valueTd.innerText.trim();
                     
                     if (label.includes('題名')) {
-                        // 移除國圖常見的 "/ 作者" 或 "=" 等標點符號後綴
                         title = value.split('/')[0].split('=')[0].trim();
                     } else if (label.includes('作者')) {
                         author = value.trim();
                     } else if (label.includes('出版項')) {
-                        // 國圖出版項通常長這樣: "臺北市 : 麥田出版 : 家庭傳媒城邦分公司發行, 2024[民113]"
-                        // 我們嘗試提取中間的出版社名稱
                         const parts = value.split(':');
                         if (parts.length > 1) {
                             publisher = parts[1].split(',')[0].trim();
@@ -577,15 +668,12 @@
                     }
                 }
                 
-                if (title) {
-                    return { title, author, publisher, source: '國家圖書館' };
-                } else {
-                    // 如果沒找到 td.td1 表格，可能是列表頁面
-                    const listTitleEl = doc.querySelector('a[href*="func=full-set-set"]');
-                    if (listTitleEl && listTitleEl.innerText.trim()) {
-                        title = listTitleEl.innerText.split('/')[0].split('=')[0].trim();
-                        return { title, author: '', publisher: '', source: '國家圖書館' };
-                    }
+                if (title) return { title, author, publisher, source: '國圖' };
+                
+                const listTitleEl = doc.querySelector('a[href*="func=full-set-set"]');
+                if (listTitleEl && listTitleEl.innerText.trim()) {
+                    title = listTitleEl.innerText.split('/')[0].split('=')[0].trim();
+                    return { title, author: '', publisher: '', source: '國圖' };
                 }
             } catch (e) { console.log("國家圖書館爬蟲失敗", e.message); }
             return null;
@@ -661,7 +749,6 @@
                 let sourceBadge = "";
                 let isSuccess = false;
 
-                // 1. 東華大學圖書館 (第一優先)
                 const ndhuRes = await scrapeNDHU(issn, 'ISSN');
                 if (ndhuRes && ndhuRes.title) {
                     journalTitle = ndhuRes.title;
@@ -671,16 +758,14 @@
                     isSuccess = true;
                 } 
                 else {
-                    // 2. 國家圖書館 (第二優先)
                     const nclRes = await scrapeNCL(issn, 'ISSN');
                     if (nclRes && nclRes.title) {
                         journalTitle = nclRes.title;
                         author = nclRes.author || '';
                         publisher = nclRes.publisher || '';
-                        sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">國家圖書館</span>`;
+                        sourceBadge = `<span class="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold shadow-sm">國圖</span>`;
                         isSuccess = true;
                     }
-                    // 3. ISSN Portal (備用防線)
                     else {
                         const html = await fetchHtml(portalUrl);
                         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -764,27 +849,13 @@
             };
 
             try {
-                // 1. 東華大學圖書館
                 if (!isPerfect()) {
                     const res = await scrapeNDHU(isbn);
                     if (res) updateData(res.title, res.author, res.publisher, res.source);
                 }
 
-                // 2. 國家圖書館 (新增)
                 if (!isPerfect()) {
                     const res = await scrapeNCL(isbn);
-                    if (res) updateData(res.title, res.author, res.publisher, res.source);
-                }
-
-                // 3. ISBNSearch 
-                if (!isPerfect()) {
-                    const res = await scrapeIsbnSearch(isbn);
-                    if (res) updateData(res.title, res.author, res.publisher, res.source);
-                }
-
-                // 4. Google Books
-                if (!isPerfect()) {
-                    const res = await scrapeNDHU(isbn);
                     if (res) updateData(res.title, res.author, res.publisher, res.source);
                 }
 
@@ -888,24 +959,30 @@
 
         function exportToCSV() {
             const rows = document.querySelectorAll('#resultsTableBody tr');
-            let csvContent = '\uFEFF時間,類型,條碼,書名與資訊,資料來源\n';
+            
+            let csvContent = '\uFEFF時間,類型,條碼,書名,作者,出版社,資料來源\n';
             let hasData = false;
 
             rows.forEach(row => {
                 if (row.id === 'emptyStateRow' && row.style.display !== 'none') return;
-                const cols = row.querySelectorAll('td');
-                if (cols.length >= 5) {
-                    const time = cols[0].innerText.trim();
-                    const type = cols[1].innerText.trim();
-                    const code = cols[2].innerText.trim();
-                    const info = cols[3].innerText.trim().replace(/\r?\n/g, ' | ');
-                    const status = cols[4].innerText.trim();
+                
+                const type = row.querySelector('td:nth-child(2)')?.innerText.replace(/\n/g, '').trim();
+                
+                if (type && type !== '判斷中') {
+                    hasData = true;
+                    
+                    const time = row.querySelector('td:nth-child(1)')?.innerText.trim() || '';
+                    const code = row.querySelector('td:nth-child(3)')?.innerText.trim() || '';
+                    
+                    const title = row.dataset.title || '';
+                    const author = row.dataset.author || '';
+                    const publisher = row.dataset.publisher || '';
+                    
+                    const status = row.querySelector('td:nth-child(5)')?.innerText.trim() || '';
 
-                    if (type !== '判斷中') {
-                        hasData = true;
-                        const escapeCSV = (str) => '"' + str.replace(/"/g, '""') + '"';
-                        csvContent += `${escapeCSV(time)},${escapeCSV(type)},${escapeCSV(code)},${escapeCSV(info)},${escapeCSV(status)}\n`;
-                    }
+                    const escapeCSV = (str) => '"' + str.replace(/"/g, '""') + '"';
+                    
+                    csvContent += `${escapeCSV(time)},${escapeCSV(type)},${escapeCSV(code)},${escapeCSV(title)},${escapeCSV(author)},${escapeCSV(publisher)},${escapeCSV(status)}\n`;
                 }
             });
 
@@ -988,6 +1065,7 @@
             document.getElementById('newZh').value = '';
             
             renderDictList();
+            updatePublisherSuggestions(); 
             showToast('已成功加入字典！');
         }
 
@@ -995,6 +1073,7 @@
             delete customPinyinDict[pinyin];
             localStorage.setItem('customPinyinDict', JSON.stringify(customPinyinDict));
             renderDictList();
+            updatePublisherSuggestions(); 
             showToast('已移除自訂字典項目');
         }
     </script>
