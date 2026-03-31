@@ -27,7 +27,7 @@
                 <p class="text-gray-500 text-sm">支援 ISBN (書籍) 與 ISSN (期刊) 自動判別、跨國庫補完與手動編輯</p>
             </div>
             <div class="mt-4 md:mt-0 text-right">
-                <p class="text-xs text-gray-400">來源：東華大學, 國圖, ISBNSearch, Google, Open Library, 三民, 博客來, ISSN Portal</p>
+                <p class="text-xs text-gray-400">來源：東華大學, 國圖, ISBNSearch, Google, OpenLib, 當當網, 三民, 博客來</p>
                 <div class="mt-2 flex flex-wrap justify-end gap-2 items-center">
                     <button onclick="openDictModal()" class="flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300 shadow-sm">
                         <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
@@ -82,7 +82,7 @@
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">條碼</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">名稱 / 作者 / 出版社</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-40">資料來源</th>
-                            <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-48">外部連結</th>
+                            <th scope="col" class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider w-56">外部連結</th>
                         </tr>
                     </thead>
                     <tbody id="resultsTableBody" class="bg-white divide-y divide-gray-200">
@@ -163,7 +163,6 @@
         // ⚙️ 使用者自訂設定區 (可隨時在此新增字典)
         // ==========================================
         
-        // 台灣常見出版社拼音字典：系統內建防線
         const BASE_PINYIN_DICTIONARY = {
             'tian xia za zhi': '天下雜誌',
             'tian xia wen hua': '天下文化',
@@ -192,10 +191,8 @@
             'mu ma wen hua': '木馬文化'
         };
 
-        // 從 LocalStorage 載入使用者透過 UI 自訂的字典
         let customPinyinDict = JSON.parse(localStorage.getItem('customPinyinDict')) || {};
 
-        // --- 修改：動態建立與更新出版社自動完成清單 (Datalist) ---
         function updatePublisherSuggestions() {
             let datalist = document.getElementById('publisher-suggestions');
             if (!datalist) {
@@ -203,20 +200,17 @@
                 datalist.id = 'publisher-suggestions';
                 document.body.appendChild(datalist);
             }
-            datalist.innerHTML = ''; // 清空重建
+            datalist.innerHTML = ''; 
             
             const combinedDict = { ...BASE_PINYIN_DICTIONARY, ...customPinyinDict };
-            // 載入純粹用於自動完成的使用者歷史紀錄 (不汙染拼音字典)
             const userPublishers = JSON.parse(localStorage.getItem('userPublishers')) || [];
             
-            // 合併內建字典、自訂字典與手動輸入過的出版社，並確保不重複
             const uniquePublishers = new Set([...Object.values(combinedDict), ...userPublishers]);
             
             for (const zh of uniquePublishers) {
                 const option = document.createElement('option');
                 option.value = zh;
                 
-                // 如果在字典中有對應的拼音，將其設為 text 讓部分瀏覽器支援拼音搜尋
                 const pinyinKey = Object.keys(combinedDict).find(key => combinedDict[key] === zh);
                 if (pinyinKey && !/[\u4E00-\u9FA5]/.test(pinyinKey)) {
                     option.text = pinyinKey;
@@ -225,7 +219,6 @@
                 datalist.appendChild(option);
             }
         }
-        // 初始化載入時呼叫一次
         updatePublisherSuggestions();
 
         const barcodeInput = document.getElementById('barcodeInput');
@@ -237,7 +230,6 @@
         // ==========================================
         
         document.addEventListener('mouseup', (e) => {
-            // 確保點擊其他輸入框時不會被搶走焦點
             const isInteractive = e.target.tagName === 'A' || 
                                   e.target.tagName === 'BUTTON' || 
                                   e.target.closest('button') || 
@@ -257,7 +249,6 @@
             }
         });
 
-        // 相機控制
         let html5QrCode;
         const startCameraBtn = document.getElementById('startCameraBtn');
         const closeCameraBtn = document.getElementById('closeCameraBtn');
@@ -282,7 +273,7 @@
                     processBarcode(decodedText);
                     barcodeInput.value = '';
                 },
-                () => {} // 忽略常態未辨識錯誤
+                () => {} 
             ).catch(() => {
                 showToast("無法存取相機，請確認是否在 HTTPS 環境下並已授予相機權限。");
                 stopCamera();
@@ -301,7 +292,6 @@
             }
         }
 
-        // 音效與提示
         function playBeep(type) {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -372,7 +362,6 @@
             const author = tr.dataset.author || '';
             const publisher = tr.dataset.publisher || '';
 
-            // 修改：在出版社輸入框加入 list="publisher-suggestions" 屬性來啟動自動完成
             infoTd.innerHTML = `
                 <div class="flex flex-col space-y-1.5">
                     <input type="text" id="edit-title-${rowId}" value="${title.replace(/"/g, '&quot;')}" class="text-sm border border-indigo-300 rounded px-2 py-1.5 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="書名 / 期刊名">
@@ -385,7 +374,7 @@
             tr.dataset.originalActions = actionTd.innerHTML;
             
             actionTd.innerHTML = `
-                <div class="flex flex-col items-end space-y-1.5">
+                <div class="flex flex-col items-end space-y-1.5 w-full">
                     <button onclick="saveRow('${rowId}')" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded w-full transition-colors shadow-sm font-bold flex justify-center items-center">
                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>儲存
                     </button>
@@ -422,7 +411,6 @@
             
             const hasZH = (str) => /[\u4E00-\u9FA5]/.test(str || '');
 
-            // --- 智慧型字典學習機制 ---
             if (newPublisher) {
                 if (oldPublisher && !hasZH(oldPublisher) && hasZH(newPublisher)) {
                     const pinyinKey = oldPublisher.toLowerCase().trim();
@@ -496,11 +484,16 @@
         // 3. 網路代理與爬蟲引擎
         // ==========================================
 
-        async function fetchHtml(targetUrl) {
+        // --- 修改：加入 encoding 參數，預設 utf-8，可支援 gbk ---
+        async function fetchHtml(targetUrl, encoding = 'utf-8') {
             let lastError = "";
             try {
                 let res = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`);
-                if (res.ok) return await res.text();
+                if (res.ok) {
+                    // 改用 ArrayBuffer 接收原始二進位資料，再依照指定編碼解碼
+                    const buffer = await res.arrayBuffer();
+                    return new TextDecoder(encoding).decode(buffer);
+                }
                 lastError = "CodeTabs: " + res.status;
             } catch(e) { lastError = e.message; }
             
@@ -582,6 +575,68 @@
                     };
                 }
             } catch (e) { console.log("博客來失敗", e); }
+            return null;
+        }
+
+        // --- 新增/修改：中國當當網爬蟲 (加入標題深度清洗器) ---
+        async function scrapeDangdang(isbn) {
+            try {
+                const targetUrl = `http://search.dangdang.com/?key=${isbn}`;
+                // 關鍵修正：告訴下載器這份網頁是 gbk 編碼，請用 gbk 解碼還原
+                const html = await fetchHtml(targetUrl, 'gbk');
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                const titleEl = doc.querySelector('.name a') || doc.querySelector('a[name="itemlist-title"]');
+                if (titleEl && titleEl.innerText.trim()) {
+                    let title = titleEl.innerText.trim();
+                    // 清除當當網常見的商品促銷雜訊
+                    title = title.replace(/【.*?】/g, '').replace(/（.*?）/g, '').trim();
+
+                    const authorEl = doc.querySelector('a[name="itemlist-author"]');
+                    const pubEl = doc.querySelector('a[name="P_cbs"]');
+
+                    let author = authorEl ? authorEl.innerText.trim() : '';
+                    let publisher = pubEl ? pubEl.innerText.trim() : '';
+
+                    // 備用尋找出版社方法
+                    if (!publisher) {
+                        const searchAuthorP = doc.querySelector('.search_book_author');
+                        if (searchAuthorP) {
+                            const spans = searchAuthorP.querySelectorAll('span');
+                            spans.forEach(span => {
+                                if (span.innerText.includes('出版社')) {
+                                    publisher = span.innerText.replace('出版社', '').replace(':', '').replace('：', '').trim();
+                                }
+                            });
+                        }
+                    }
+
+                    // ====== 深度標題清洗器 ======
+                    // 1. 移除標題內的 ISBN
+                    title = title.replace(new RegExp(isbn, 'g'), '');
+                    
+                    // 2. 利用空白切割，精準移除與作者、出版社完全相同的獨立區塊
+                    let parts = title.split(/\s+/);
+                    title = parts.filter(part => {
+                        if (publisher && part === publisher) return false;
+                        if (author && (part === author || part === author + '著' || part === author + '编' || part === author + '译')) return false;
+                        if (/^(著|编|译|绘|著\/绘)$/.test(part)) return false;
+                        return true;
+                    }).join(' ').trim();
+
+                    // 3. 防範沒有空白分隔的情況，二次切除結尾的出版社或作者名稱
+                    if (publisher && title.endsWith(publisher)) {
+                        title = title.substring(0, title.length - publisher.length).trim();
+                    }
+                    if (author) {
+                        const authorSuffixRegex = new RegExp(`${author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(著|编|译|绘)?$`);
+                        title = title.replace(authorSuffixRegex, '').trim();
+                    }
+                    // ==============================
+
+                    return { title, author, publisher, source: '當當網' };
+                }
+            } catch (e) { console.log("當當網爬蟲失敗", e.message); }
             return null;
         }
 
@@ -725,20 +780,16 @@
             const portalUrl = `https://portal.issn.org/resource/ISSN/${issn}`;
             
             const actionHtml = `
-                <div class="flex flex-col items-end space-y-1.5">
+                <div class="flex flex-col items-end space-y-1.5 w-full max-w-[150px] ml-auto">
                     <button onclick="copyToClipboard('${issn}'); showToast('條碼 ${issn} 已複製');" class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-300 w-full transition-colors shadow-sm flex justify-center items-center">
                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                         複製條碼
                     </button>
-                    <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-xs font-medium bg-purple-50 px-2 py-1 rounded w-full text-center border border-purple-100">
-                        東華大學
-                    </a>
-                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded w-full text-center border border-blue-100">
-                        國家圖書館
-                    </a>
-                    <a href="${portalUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-xs font-medium bg-indigo-50 px-2 py-1 rounded w-full text-center border border-indigo-100">
-                        ISSN Portal
-                    </a>
+                    <div class="grid grid-cols-2 gap-1 w-full">
+                        <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-[11px] font-medium bg-purple-50 px-1 py-1 rounded text-center border border-purple-100">東華</a>
+                        <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-[11px] font-medium bg-blue-50 px-1 py-1 rounded text-center border border-blue-100">國圖</a>
+                        <a href="${portalUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800 text-[11px] font-medium bg-indigo-50 px-1 py-1 rounded text-center border border-indigo-100 col-span-2">ISSN Portal</a>
+                    </div>
                 </div>
             `;
 
@@ -801,22 +852,24 @@
             const ndhuLink = `https://books-lib.ndhu.edu.tw/toread/opac/search?q=${isbn}&search_field=ISBN`;
             const nclLink = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=ISBN&request=${isbn}`;
             const booksLink = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
+            // 新增豆瓣與當當網的外部搜尋連結
+            const doubanLink = `https://search.douban.com/book/subject_search?search_text=${isbn}`;
+            const dangdangLink = `http://search.dangdang.com/?key=${isbn}`;
             
+            // 將按鈕排版改為雙排網格，整齊且不占空間
             const actionHtml = `
-                <div class="flex flex-col items-end space-y-1.5">
+                <div class="flex flex-col items-end space-y-1.5 w-full max-w-[150px] ml-auto">
                     <button onclick="copyToClipboard('${isbn}'); showToast('條碼 ${isbn} 已複製');" class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-300 w-full transition-colors shadow-sm flex justify-center items-center">
                         <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
                         複製條碼
                     </button>
-                    <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-xs font-medium bg-purple-50 px-2 py-1 rounded w-full text-center border border-purple-100">
-                        東華大學
-                    </a>
-                    <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium bg-blue-50 px-2 py-1 rounded w-full text-center border border-blue-100">
-                        國家圖書館
-                    </a>
-                    <a href="${booksLink}" target="_blank" class="text-green-600 hover:text-green-800 text-xs font-medium bg-green-50 px-2 py-1 rounded w-full text-center border border-green-100">
-                        博客來查詢
-                    </a>
+                    <div class="grid grid-cols-2 gap-1 w-full">
+                        <a href="${ndhuLink}" target="_blank" class="text-purple-600 hover:text-purple-800 text-[11px] font-medium bg-purple-50 px-1 py-1 rounded text-center border border-purple-100">東華</a>
+                        <a href="${nclLink}" target="_blank" class="text-blue-600 hover:text-blue-800 text-[11px] font-medium bg-blue-50 px-1 py-1 rounded text-center border border-blue-100">國圖</a>
+                        <a href="${booksLink}" target="_blank" class="text-green-600 hover:text-green-800 text-[11px] font-medium bg-green-50 px-1 py-1 rounded text-center border border-green-100">博客來</a>
+                        <a href="${dangdangLink}" target="_blank" class="text-red-600 hover:text-red-800 text-[11px] font-medium bg-red-50 px-1 py-1 rounded text-center border border-red-100">當當網</a>
+                        <a href="${doubanLink}" target="_blank" class="text-emerald-700 hover:text-emerald-900 text-[11px] font-medium bg-emerald-50 px-1 py-1 rounded text-center border border-emerald-100 col-span-2">豆瓣圖書查詢</a>
+                    </div>
                 </div>
             `;
 
@@ -888,6 +941,12 @@
                             updateData(info.title, info.authors?.map(a=>a.name).join(', '), info.publishers?.map(p=>p.name).join(', '), 'OpenLib');
                         }
                     } catch (e) {}
+                }
+
+                // --- 插入中國圖書防線：當當網 ---
+                if (!isPerfect()) {
+                    const res = await scrapeDangdang(isbn);
+                    if (res) updateData(res.title, res.author, res.publisher, res.source);
                 }
 
                 if (!isPerfect()) {
