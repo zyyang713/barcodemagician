@@ -10,6 +10,8 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
     <!-- 引入 pinyin-pro 用於中文字轉拼音 -->
     <script src="https://unpkg.com/pinyin-pro"></script>
+    <!-- 引入 OpenCC 用於簡體轉繁體中文 -->
+    <script src="https://cdn.jsdelivr.net/npm/opencc-js@1.0.5/dist/umd/full.js"></script>
     <style>
         td { vertical-align: middle; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -54,7 +56,7 @@
                 請連接實體條碼槍掃描，或使用平板/手機相機掃描：
             </label>
             
-            <div class="flex flex-col md:flex-row items-center justify-center gap-4 max-w-3xl mx-auto">
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 max-w-4xl mx-auto">
                 <input 
                     type="text" 
                     id="barcodeInput" 
@@ -63,10 +65,16 @@
                     autocomplete="off"
                 >
                 
-                <button id="startCameraBtn" class="flex items-center justify-center px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-300 w-full md:w-auto h-full text-lg whitespace-nowrap">
-                    <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                    相機掃描
-                </button>
+                <div class="flex gap-2 w-full md:w-auto h-full">
+                    <button id="startCameraBtn" class="flex-1 md:flex-none flex items-center justify-center px-6 py-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-indigo-300 text-lg whitespace-nowrap">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        相機掃描
+                    </button>
+                    <button onclick="addManualRow()" class="flex-1 md:flex-none flex items-center justify-center px-6 py-4 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 shadow-lg transition-transform transform hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-emerald-300 text-lg whitespace-nowrap">
+                        <svg class="w-6 h-6 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        手動新增
+                    </button>
+                </div>
             </div>
             <p class="mt-4 text-sm text-gray-400">系統會在收到條碼後自動進行跨國與本土資料庫查詢</p>
         </div>
@@ -159,6 +167,18 @@
     </div>
 
     <script>
+        // ==========================================
+        // 0. 初始化簡繁轉換引擎
+        // ==========================================
+        let cn2tw = (text) => text;
+        try {
+            if (window.OpenCC) {
+                cn2tw = OpenCC.Converter({ from: 'cn', to: 'tw' });
+            }
+        } catch (e) {
+            console.error("OpenCC 載入失敗，將無法自動轉換繁體", e);
+        }
+
         // ==========================================
         // ⚙️ 使用者自訂設定區 (可隨時在此新增字典)
         // ==========================================
@@ -328,6 +348,54 @@
         // 2. 手動編輯與刪除功能
         // ==========================================
 
+        // --- 新增：手動新增一筆全新空白資料 ---
+        function addManualRow() {
+            if (emptyStateRow) emptyStateRow.style.display = 'none';
+
+            const rowId = 'row-' + Date.now();
+            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+
+            let tr = document.createElement('tr');
+            tr.id = rowId;
+            tr.className = "hover:bg-gray-50 transition-colors";
+            
+            // 建立乾淨的空白資料綁定
+            tr.dataset.title = '';
+            tr.dataset.author = '';
+            tr.dataset.publisher = '';
+            tr.dataset.isError = "false";
+            tr.dataset.isEditing = "false"; 
+
+            const actionHtml = `
+                <div class="flex flex-col items-end space-y-1.5 w-full max-w-[150px] ml-auto">
+                    <span class="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded w-full text-center border border-gray-200">無外部連結</span>
+                </div>
+            `;
+
+            const editDeleteHtml = `
+                <div class="mt-2 flex justify-between space-x-1 border-t pt-2 border-gray-100">
+                    <button onclick="editRow('${rowId}')" class="text-xs bg-yellow-50 hover:bg-yellow-100 text-yellow-700 px-2 py-1.5 rounded border border-yellow-200 flex-1 transition-colors shadow-sm">編輯</button>
+                    <button onclick="deleteRow('${rowId}')" class="text-xs bg-red-50 hover:bg-red-100 text-red-700 px-2 py-1.5 rounded border border-red-200 flex-1 transition-colors shadow-sm">刪除</button>
+                </div>
+            `;
+
+            tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${timeStr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-bold">
+                    <span class="px-2.5 py-1 rounded border shadow-sm text-gray-700 bg-gray-50 border-gray-200">手動</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-800 bg-gray-50 font-bold">無條碼</td>
+                <td class="px-6 py-4 text-sm text-gray-800 info-cell"></td>
+                <td class="px-6 py-4 text-sm source-cell"><span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs font-semibold shadow-sm">手動新增</span></td>
+                <td class="px-6 py-4 text-right action-cell">${actionHtml + editDeleteHtml}</td>
+            `;
+
+            resultsTableBody.insertBefore(tr, resultsTableBody.firstChild);
+
+            // 建立完畢後，直接觸發編輯模式讓使用者輸入
+            editRow(rowId);
+        }
+
         function deleteRow(rowId) {
             const tr = document.getElementById(rowId);
             if (tr) {
@@ -484,13 +552,11 @@
         // 3. 網路代理與爬蟲引擎
         // ==========================================
 
-        // --- 修改：加入 encoding 參數，預設 utf-8，可支援 gbk ---
         async function fetchHtml(targetUrl, encoding = 'utf-8') {
             let lastError = "";
             try {
                 let res = await fetch(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(targetUrl)}`);
                 if (res.ok) {
-                    // 改用 ArrayBuffer 接收原始二進位資料，再依照指定編碼解碼
                     const buffer = await res.arrayBuffer();
                     return new TextDecoder(encoding).decode(buffer);
                 }
@@ -578,19 +644,25 @@
             return null;
         }
 
-        // --- 新增/修改：中國當當網爬蟲 (加入標題深度清洗器) ---
+        // --- 中國當當網爬蟲 (支援廣告清洗與簡繁轉換) ---
         async function scrapeDangdang(isbn) {
             try {
                 const targetUrl = `http://search.dangdang.com/?key=${isbn}`;
-                // 關鍵修正：告訴下載器這份網頁是 gbk 編碼，請用 gbk 解碼還原
                 const html = await fetchHtml(targetUrl, 'gbk');
                 const doc = new DOMParser().parseFromString(html, 'text/html');
 
                 const titleEl = doc.querySelector('.name a') || doc.querySelector('a[name="itemlist-title"]');
                 if (titleEl && titleEl.innerText.trim()) {
                     let title = titleEl.innerText.trim();
-                    // 清除當當網常見的商品促銷雜訊
-                    title = title.replace(/【.*?】/g, '').replace(/（.*?）/g, '').trim();
+                    
+                    title = title.replace(/【.*?】/g, '')
+                                 .replace(/（.*?）/g, '')
+                                 .replace(/\[.*?\]/g, '');
+                                 
+                    // 擴充過濾器：加入「正版旧书」、「保证质量」、「此书为」、「电子发票」等雜訊
+                    title = title.replace(/\s*(线上线下|咨询客服|请咨询客服|正版包邮|全新正版|官方正版|正版现货|现货速发|拍前必读|购买前请|实体店同步|保证正版|正版图书|下单前|欢迎选购|正版旧书|保证质量|此书为|电子发票).*$/g, '');
+                    
+                    title = title.replace(/[,，。；;、！!]+$/, '').trim();
 
                     const authorEl = doc.querySelector('a[name="itemlist-author"]');
                     const pubEl = doc.querySelector('a[name="P_cbs"]');
@@ -598,7 +670,6 @@
                     let author = authorEl ? authorEl.innerText.trim() : '';
                     let publisher = pubEl ? pubEl.innerText.trim() : '';
 
-                    // 備用尋找出版社方法
                     if (!publisher) {
                         const searchAuthorP = doc.querySelector('.search_book_author');
                         if (searchAuthorP) {
@@ -611,28 +682,28 @@
                         }
                     }
 
-                    // ====== 深度標題清洗器 ======
-                    // 1. 移除標題內的 ISBN
                     title = title.replace(new RegExp(isbn, 'g'), '');
                     
-                    // 2. 利用空白切割，精準移除與作者、出版社完全相同的獨立區塊
                     let parts = title.split(/\s+/);
                     title = parts.filter(part => {
                         if (publisher && part === publisher) return false;
-                        if (author && (part === author || part === author + '著' || part === author + '编' || part === author + '译')) return false;
-                        if (/^(著|编|译|绘|著\/绘)$/.test(part)) return false;
+                        if (author && (part === author || part === author + '著' || part === author + '编' || part === author + '译' || part === author + '卷')) return false;
+                        if (/^(著|编|译|绘|卷|著\/绘)$/.test(part)) return false;
                         return true;
                     }).join(' ').trim();
 
-                    // 3. 防範沒有空白分隔的情況，二次切除結尾的出版社或作者名稱
                     if (publisher && title.endsWith(publisher)) {
                         title = title.substring(0, title.length - publisher.length).trim();
                     }
                     if (author) {
-                        const authorSuffixRegex = new RegExp(`${author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(著|编|译|绘)?$`);
+                        const authorSuffixRegex = new RegExp(`${author.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(著|编|译|绘|卷)?$`);
                         title = title.replace(authorSuffixRegex, '').trim();
                     }
-                    // ==============================
+
+                    // --- 自動簡繁轉換 ---
+                    title = cn2tw(title);
+                    author = cn2tw(author);
+                    publisher = cn2tw(publisher);
 
                     return { title, author, publisher, source: '當當網' };
                 }
@@ -852,11 +923,9 @@
             const ndhuLink = `https://books-lib.ndhu.edu.tw/toread/opac/search?q=${isbn}&search_field=ISBN`;
             const nclLink = `https://aleweb.ncl.edu.tw/F/?func=find-b&find_code=ISBN&request=${isbn}`;
             const booksLink = `https://search.books.com.tw/search/query/key/${isbn}/cat/all`;
-            // 新增豆瓣與當當網的外部搜尋連結
             const doubanLink = `https://search.douban.com/book/subject_search?search_text=${isbn}`;
             const dangdangLink = `http://search.dangdang.com/?key=${isbn}`;
             
-            // 將按鈕排版改為雙排網格，整齊且不占空間
             const actionHtml = `
                 <div class="flex flex-col items-end space-y-1.5 w-full max-w-[150px] ml-auto">
                     <button onclick="copyToClipboard('${isbn}'); showToast('條碼 ${isbn} 已複製');" class="text-xs bg-white hover:bg-gray-50 text-gray-700 px-3 py-1.5 rounded border border-gray-300 w-full transition-colors shadow-sm flex justify-center items-center">
@@ -943,7 +1012,6 @@
                     } catch (e) {}
                 }
 
-                // --- 插入中國圖書防線：當當網 ---
                 if (!isPerfect()) {
                     const res = await scrapeDangdang(isbn);
                     if (res) updateData(res.title, res.author, res.publisher, res.source);
